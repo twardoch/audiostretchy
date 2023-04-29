@@ -1,6 +1,18 @@
 import ctypes
+import platform
+from pathlib import Path
 
-stretch_lib = ctypes.cdll.LoadLibrary("_stretch.so")
+if platform.system() == 'Windows':
+    lib_path = Path(__file__).parent / 'win' / '_stretch.dll'
+elif platform.system() == 'Darwin':  # Mac
+    lib_path = Path(__file__).parent / 'mac' / '_stretch.dylib'
+elif platform.system() == 'Linux':  # Linux
+    lib_path = Path(__file__).parent / 'linux' / '_stretch.so'
+else:
+    raise NotImplementedError("This platform is not supported.")
+
+stretch_lib = ctypes.cdll.LoadLibrary(str(lib_path))
+
 
 class Stretch:
     def __init__(self, shortest_period, longest_period, num_chans, flags):

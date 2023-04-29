@@ -1,20 +1,12 @@
-# GitHub Actions configuration **EXAMPLE**,
-# MODIFY IT ACCORDING TO YOUR NEEDS!
-# Reference: https://docs.github.com/en/actions
-
 name: tests
 
 on:
   push:
-    # Avoid using all the resources/limits available by checking only
-    # relevant branches and tags. Other branches can be checked via PRs.
     branches: [main]
-    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']  # Match tags that resemble a version
-  pull_request:  # Run in every PR
-  workflow_dispatch:  # Allow manually triggering the workflow
+    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
   schedule:
-    # Run roughly every 15 days at 00:00 UTC
-    # (useful to check if updates on dependencies break the package)
     - cron: '0 0 1,16 * *'
 
 permissions:
@@ -27,16 +19,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  compile:
+    strategy:
+      matrix:
+        platform:
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install build-essential (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install build-essential
+      - name: Install Xcode command line tools (macOS)
+        if: runner.os == 'macOS'
+        run: xcode-select --install
+      - name: Install MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Compile stretch.c
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            gcc -shared -o _stretch.so vendors/stretch/stretch.c
+            mkdir -p src/audiostretchy/interface/linux
+            mv _stretch.so src/audiostretchy/interface/linux/
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
+            mkdir -p src/audiostretchy/interface/mac
+            mv _stretch.dylib src/audiostretchy/interface/mac/
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            cl /LD vendors/stretch/stretch.c
+            mkdir -p src/audiostretchy/interface/win
+            move stretch.dll src/audiostretchy/interface/win/_stretch.dll
+          fi
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: compiled-files-${{ matrix.platform }}
+          path: ./src/audiostretchy/interface/${{ matrix.platform }}/
+
   prepare:
+    needs: compile
     runs-on: ubuntu-latest
     outputs:
       wheel-distribution: ${{ steps.wheel-distribution.outputs.path }}
     steps:
       - uses: actions/checkout@v3
-        with: {fetch-depth: 0}  # deep clone for setuptools-scm
+        with: {fetch-depth: 0}
+      - name: Retrieve compiled files
+        uses: actions/download-artifact@v2
+        with:
+          name: compiled-files-ubuntu-latest
+          path: ./src/audiostretchy/interface/
+      - name: Retrieve compiled files
+        uses: actions/download-artifact@v2
+        with:
+          name: compiled-files-macos-latest
+          path: ./src/audiostretchy/interface/
+      - name: Retrieve compiled files
+        uses: actions/download-artifact@v2
+        with:
+          name: compiled-files-windows-latest
+          path: ./src/audiostretchy/interface/
       - uses: actions/setup-python@v4
-        id: setup-python
-        with: {python-version: "3.11"}
+        with: {python-version: "3.10"}
       - name: Run static analysis and format checkers
         run: pipx run pre-commit run --all-files --show-diff-on-failure
       - name: Build package distribution files
@@ -45,10 +92,8 @@ jobs:
           tox -e clean,build
       - name: Record the path of wheel distribution
         id: wheel-distribution
-        run: echo "path=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
+        run: echo "path=$(ls dist/*.whl)" >> $GITHUB_ENV
       - name: Store the distribution files for use in other stages
-        # `tests` and `publish` will use the same pre-built distributions,
-        # so we make sure to release the exact same package that was tested
         uses: actions/upload-artifact@v3
         with:
           name: python-distribution-files
@@ -60,8 +105,8 @@ jobs:
     strategy:
       matrix:
         python:
-        - "3.7"  # oldest Python supported by PSF
-        - "3.11"  # newest Python that is stable
+        - "3.7"  
+        - "3.10"  
         platform:
         - ubuntu-latest
         - macos-latest
@@ -70,7 +115,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-        id: setup-python
         with:
           python-version: ${{ matrix.python }}
       - name: Retrieve pre-built distribution files
@@ -110,15 +154,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-        with: {python-version: "3.11"}
+        with: {python-version: "3.10"}
       - name: Retrieve pre-built distribution files
         uses: actions/download-artifact@v3
         with: {name: python-distribution-files, path: dist/}
       - name: Publish Package
         env:
-          # TODO: Set your PYPI_TOKEN as a secret using GitHub UI
-          # - https://pypi.org/help/#apitoken
-          # - https://docs.github.com/en/actions/security-guides/encrypted-secrets
           TWINE_REPOSITORY: pypi
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
