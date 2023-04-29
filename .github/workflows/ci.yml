@@ -33,9 +33,6 @@ jobs:
     - name: Install build-essential (Ubuntu)
       if: runner.os == 'Linux'
       run: sudo apt-get install build-essential
-    - name: Install Xcode command line tools (macOS)
-      if: runner.os == 'macOS'
-      run: xcode-select --install
     - name: Install MSVC (Windows)
       if: runner.os == 'Windows'
       uses: ilammy/msvc-dev-cmd@v1
