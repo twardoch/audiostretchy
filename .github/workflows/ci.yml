@@ -7,15 +7,14 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 1,16 * *'
+  - cron: '0 0 1,16 * *'
 
 permissions:
   contents: read
 
 concurrency:
   group: >-
-    ${{ github.workflow }}-${{ github.ref_type }}-
-    ${{ github.event.pull_request.number || github.sha }}
+    ${{ github.workflow }}-${{ github.ref_type }}- ${{ github.event.pull_request.number || github.sha }} #magic___^_^___line #magic___^_^___line
   cancel-in-progress: true
 
 jobs:
@@ -28,36 +27,38 @@ jobs:
         - windows-latest
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Install build-essential (Ubuntu)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install build-essential
-      - name: Install Xcode command line tools (macOS)
-        if: runner.os == 'macOS'
-        run: xcode-select --install
-      - name: Install MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-      - name: Compile stretch.c
-        run: |
-          if [ "${{ runner.os }}" == "Linux" ]; then
-            gcc -shared -o _stretch.so vendors/stretch/stretch.c
-            mkdir -p src/audiostretchy/interface/linux
-            mv _stretch.so src/audiostretchy/interface/linux/
-          elif [ "${{ runner.os }}" == "macOS" ]; then
-            gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
-            mkdir -p src/audiostretchy/interface/mac
-            mv _stretch.dylib src/audiostretchy/interface/mac/
-          elif [ "${{ runner.os }}" == "Windows" ]; then
-            cl /LD vendors/stretch/stretch.c
-            mkdir -p src/audiostretchy/interface/win
-            move stretch.dll src/audiostretchy/interface/win/_stretch.dll
-          fi
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: compiled-files-${{ matrix.platform }}
-          path: ./src/audiostretchy/interface/${{ matrix.platform }}/
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Install build-essential (Ubuntu)
+      if: runner.os == 'Linux'
+      run: sudo apt-get install build-essential
+    - name: Install Xcode command line tools (macOS)
+      if: runner.os == 'macOS'
+      run: xcode-select --install
+    - name: Install MSVC (Windows)
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Compile stretch.c
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          gcc -shared -o _stretch.so vendors/stretch/stretch.c
+          mkdir -p src/audiostretchy/interface/linux
+          mv _stretch.so src/audiostretchy/interface/linux/
+        elif [ "${{ runner.os }}" == "macOS" ]; then
+          gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
+          mkdir -p src/audiostretchy/interface/mac
+          mv _stretch.dylib src/audiostretchy/interface/mac/
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          cl /LD vendors/stretch/stretch.c
+          mkdir -p src/audiostretchy/interface/win
+          move stretch.dll src/audiostretchy/interface/win/_stretch.dll
+        fi
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: compiled-files-${{ matrix.platform }}
+        path: ./src/audiostretchy/interface/${{ matrix.platform }}/
 
   prepare:
     needs: compile
@@ -65,85 +66,91 @@ jobs:
     outputs:
       wheel-distribution: ${{ steps.wheel-distribution.outputs.path }}
     steps:
-      - uses: actions/checkout@v3
-        with: {fetch-depth: 0}
-      - name: Retrieve compiled files
-        uses: actions/download-artifact@v2
-        with:
-          name: compiled-files-ubuntu-latest
-          path: ./src/audiostretchy/interface/
-      - name: Retrieve compiled files
-        uses: actions/download-artifact@v2
-        with:
-          name: compiled-files-macos-latest
-          path: ./src/audiostretchy/interface/
-      - name: Retrieve compiled files
-        uses: actions/download-artifact@v2
-        with:
-          name: compiled-files-windows-latest
-          path: ./src/audiostretchy/interface/
-      - uses: actions/setup-python@v4
-        with: {python-version: "3.10"}
-      - name: Run static analysis and format checkers
-        run: pipx run pre-commit run --all-files --show-diff-on-failure
-      - name: Build package distribution files
-        run: >-
-          pipx run --python '${{ steps.setup-python.outputs.python-path }}'
-          tox -e clean,build
-      - name: Record the path of wheel distribution
-        id: wheel-distribution
-        run: echo "path=$(ls dist/*.whl)" >> $GITHUB_ENV
-      - name: Store the distribution files for use in other stages
-        uses: actions/upload-artifact@v3
-        with:
-          name: python-distribution-files
-          path: dist/
-          retention-days: 1
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+        fetch-depth: 0
+    - name: Retrieve compiled files
+      uses: actions/download-artifact@v2
+      with:
+        name: compiled-files-ubuntu-latest
+        path: ./src/audiostretchy/interface/
+    - name: Retrieve compiled files
+      uses: actions/download-artifact@v2
+      with:
+        name: compiled-files-macos-latest
+        path: ./src/audiostretchy/interface/
+    - name: Retrieve compiled files
+      uses: actions/download-artifact@v2
+      with:
+        name: compiled-files-windows-latest
+        path: ./src/audiostretchy/interface/
+    - uses: actions/setup-python@v4
+      with: {python-version: '3.10'}
+    - name: Run static analysis and format checkers
+      run: pipx run pre-commit run --all-files --show-diff-on-failure
+    - name: Build package distribution files
+      run: >-
+        pipx run --python '${{ steps.setup-python.outputs.python-path }}' tox -e clean,build
+
+
+    - name: Record the path of wheel distribution
+      id: wheel-distribution
+      run: echo "path=$(ls dist/*.whl)" >> $GITHUB_ENV
+    - name: Store the distribution files for use in other stages
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-distribution-files
+        path: dist/
+        retention-days: 1
 
   test:
     needs: prepare
     strategy:
       matrix:
         python:
-        - "3.7"  
-        - "3.10"  
+        - '3.7'
+        - '3.10'
         platform:
         - ubuntu-latest
         - macos-latest
         - windows-latest
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Retrieve pre-built distribution files
-        uses: actions/download-artifact@v3
-        with: {name: python-distribution-files, path: dist/}
-      - name: Run tests
-        run: >-
-          pipx run --python '${{ steps.setup-python.outputs.python-path }}'
-          tox --installpkg '${{ needs.prepare.outputs.wheel-distribution }}'
-          -- -rFEx --durations 10 --color yes  # pytest args
-      - name: Generate coverage report
-        run: pipx run coverage lcov -o coverage.lcov
-      - name: Upload partial coverage report
-        uses: coverallsapp/github-action@master
-        with:
-          path-to-lcov: coverage.lcov
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          flag-name: ${{ matrix.platform }} - py${{ matrix.python }}
-          parallel: true
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Retrieve pre-built distribution files
+      uses: actions/download-artifact@v3
+      with: {name: python-distribution-files, path: dist/}
+    - name: Run tests
+      run: >-
+        pipx run --python '${{ steps.setup-python.outputs.python-path }}' tox --installpkg '${{ needs.prepare.outputs.wheel-distribution }}' -- -rFEx --durations 10 --color yes  # pytest args
+
+
+    - name: Generate coverage report
+      run: pipx run coverage lcov -o coverage.lcov
+    - name: Upload partial coverage report
+      uses: coverallsapp/github-action@master
+      with:
+        path-to-lcov: coverage.lcov
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        flag-name: ${{ matrix.platform }} - py${{ matrix.python }}
+        parallel: true
 
   finalize:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Finalize coverage report
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
+    - name: Finalize coverage report
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
 
   publish:
     needs: finalize
@@ -152,15 +159,17 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with: {python-version: "3.10"}
-      - name: Retrieve pre-built distribution files
-        uses: actions/download-artifact@v3
-        with: {name: python-distribution-files, path: dist/}
-      - name: Publish Package
-        env:
-          TWINE_REPOSITORY: pypi
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: pipx run tox -e publish
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - uses: actions/setup-python@v4
+      with: {python-version: '3.10'}
+    - name: Retrieve pre-built distribution files
+      uses: actions/download-artifact@v3
+      with: {name: python-distribution-files, path: dist/}
+    - name: Publish Package
+      env:
+        TWINE_REPOSITORY: pypi
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      run: pipx run tox -e publish
