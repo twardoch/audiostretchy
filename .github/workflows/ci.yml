@@ -42,7 +42,7 @@ jobs:
     - name: Compile stretch.c
       run: |
         if [ "${{ runner.os }}" == "Linux" ]; then
-          gcc -shared -o _stretch.so vendors/stretch/stretch.c
+          gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
           mkdir -p src/audiostretchy/interface/linux
           mv _stretch.so src/audiostretchy/interface/linux/
         elif [ "${{ runner.os }}" == "macOS" ]; then
