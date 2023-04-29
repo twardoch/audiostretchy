@@ -1,0 +1,6 @@
+[submodule "vendors/stretch"]
+	path = vendors/stretch
+	url = https://github.com/dbry/audio-stretch
+[submodule "vendors/resample"]
+	path = vendors/resample
+	url = https://github.com/dbry/audio-resampler
