@@ -34,4 +34,5 @@ jobs:
         path: ./artifacts/
     - name: Verify artifact contents
       run: |
+        mkdir -p artifacts/src/audiostretchy/interface/mac/
         ls -l artifacts/src/audiostretchy/interface/mac/
