@@ -1,0 +1,31 @@
+name: Compile on Linux
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Install build-essential
+      run: sudo apt-get install build-essential
+    - name: Compile stretch.c
+      shell: bash {0}
+      run: |
+        gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
+        mkdir -p src/audiostretchy/interface/linux
+        mv _stretch.so src/audiostretchy/interface/linux/
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: compiled-files-linux
+        path: ./src/audiostretchy/interface/linux/

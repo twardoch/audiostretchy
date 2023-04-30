@@ -1,0 +1,31 @@
+name: Compile on Windows
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Install MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Compile stretch.c
+      shell: pwsh
+      run: |
+        cl /LD /Fe:stretch.dll vendors/stretch/stretch.c
+        mkdir -p src/audiostretchy/interface/win
+        mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: compiled-files-windows
+        path: ./src/audiostretchy/interface/win/
