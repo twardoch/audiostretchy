@@ -36,8 +36,10 @@ jobs:
     - name: Install MSVC (Windows)
       if: runner.os == 'Windows'
       uses: ilammy/msvc-dev-cmd@v1
+
+
     - name: Compile stretch.c
-      shell: bash
+      shell: bash {0}
       run: |
         if [ "${{ runner.os }}" == "Linux" ]; then
           gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
@@ -47,11 +49,14 @@ jobs:
           gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
           mkdir -p src/audiostretchy/interface/mac
           mv _stretch.dylib src/audiostretchy/interface/mac/
-        elif [ "${{ runner.os }}" == "Windows" ]; then
-          cl /LD /Fe:stretch.dll vendors/stretch/stretch.c
-          mkdir -p src/audiostretchy/interface/win
-          mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
         fi
+    - name: Compile stretch.c (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        cl /LD /Fe:stretch.dll vendors/stretch/stretch.c
+        mkdir -p src/audiostretchy/interface/win
+        mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
 
 
 
