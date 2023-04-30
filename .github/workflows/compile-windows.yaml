@@ -13,7 +13,7 @@ jobs:
   compile-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
       with:
         submodules: true
     - name: Install MSVC
@@ -24,8 +24,17 @@ jobs:
         cl /LD /Fe:stretch.dll vendors/stretch/stretch.c
         mkdir -p src/audiostretchy/interface/win
         mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
+        ls -l src/audiostretchy/interface/win/
     - name: Archive production artifacts
       uses: actions/upload-artifact@v2
       with:
         name: compiled-files-windows
         path: ./src/audiostretchy/interface/win/
+    - name: Download and verify artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: compiled-files-windows
+        path: ./artifacts/
+    - name: Verify artifact contents
+      run: |
+        ls -l artifacts/src/audiostretchy/interface/win/

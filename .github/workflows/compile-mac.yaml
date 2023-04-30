@@ -13,7 +13,7 @@ jobs:
   compile-mac:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
       with:
         submodules: true
     - name: Compile stretch.c
@@ -21,8 +21,17 @@ jobs:
         gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
         mkdir -p src/audiostretchy/interface/mac
         mv _stretch.dylib src/audiostretchy/interface/mac/
+        ls -l src/audiostretchy/interface/mac/
     - name: Archive production artifacts
       uses: actions/upload-artifact@v2
       with:
         name: compiled-files-macos
         path: ./src/audiostretchy/interface/mac/
+    - name: Download and verify artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: compiled-files-macos
+        path: ./artifacts/
+    - name: Verify artifact contents
+      run: |
+        ls -l artifacts/src/audiostretchy/interface/mac/
