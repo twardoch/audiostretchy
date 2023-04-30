@@ -1,7 +1,6 @@
 # Temporary and binary files
 *~
 *.py[cod]
-*.so
 *.cfg
 !.isort.cfg
 !setup.cfg
