@@ -18,12 +18,12 @@ jobs:
         submodules: true
     - name: Compile stretch.c
       run: |
-        gcc -shared -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
+        gcc -shared -O3 -s -o _stretch.dylib vendors/stretch/stretch.c -arch x86_64 -arch arm64
         mkdir -p src/audiostretchy/interface/mac
         mv _stretch.dylib src/audiostretchy/interface/mac/
         ls -l src/audiostretchy/interface/mac/
     - name: Commit and push if changed
       uses: EndBug/add-and-commit@v7
       with:
-        message: "Update compiled files"
+        message: "Update macOS compiled lib"
         add: 'src/audiostretchy/interface/mac/_stretch.dylib'

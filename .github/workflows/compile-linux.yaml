@@ -23,11 +23,11 @@ jobs:
     - name: Compile stretch.c
       shell: bash {0}
       run: |
-        gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
+        gcc -fPIC -O3 -shared -s -o _stretch.so vendors/stretch/stretch.c
         mv _stretch.so src/audiostretchy/interface/linux/
         ls -l src/audiostretchy/interface/linux/
     - name: Commit and push if changed
       uses: EndBug/add-and-commit@v7
       with:
-        message: "Update compiled files"
+        message: "Update Linux compiled lib"
         add: 'src/audiostretchy/interface/linux/_stretch.so'

@@ -21,12 +21,12 @@ jobs:
     - name: Compile stretch.c
       shell: pwsh
       run: |
-        cl /LD /Fe:stretch.dll vendors/stretch/stretch.c
+        cl /LD /Fe:stretch.dll /O2 /MT vendors/stretch/stretch.c
         mkdir -p src/audiostretchy/interface/win
         mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
         ls -l src/audiostretchy/interface/win/
     - name: Commit and push if changed
       uses: EndBug/add-and-commit@v7
       with:
-        message: "Update compiled files"
+        message: "Update Windows compiled lib"
         add: 'src/audiostretchy/interface/win/_stretch.dll'
