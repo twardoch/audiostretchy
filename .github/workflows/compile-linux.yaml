@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile-linux:
@@ -26,16 +26,8 @@ jobs:
         gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
         mv _stretch.so src/audiostretchy/interface/linux/
         ls -l src/audiostretchy/interface/linux/
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@v2
+    - name: Commit and push if changed
+      uses: EndBug/add-and-commit@v7
       with:
-        name: compiled-files-linux
-        path: ./src/audiostretchy/interface/linux/
-    - name: Download and verify artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: compiled-files-linux
-        path: ./artifacts/
-    - name: Verify artifact contents
-      run: |
-        ls -l artifacts/src/audiostretchy/interface/linux/
+        message: "Update compiled files"
+        add: 'src/audiostretchy/interface/linux/_stretch.so'
