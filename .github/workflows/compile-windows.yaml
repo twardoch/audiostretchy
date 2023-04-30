@@ -23,7 +23,7 @@ jobs:
       run: |
         cl /LD /Fe:stretch.dll /O2 /MT vendors/stretch/stretch.c
         New-Item -ItemType Directory -Path src/audiostretchy/interface/win -Force
-        mv stretch.dll src/audiostretchy/interface/win/_stretch.dll
+        Move-Item -Path stretch.dll -Destination src/audiostretchy/interface/win/_stretch.dll -Force
         ls -l src/audiostretchy/interface/win/
     - name: Commit and push if changed
       uses: EndBug/add-and-commit@v7
