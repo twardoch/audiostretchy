@@ -1,16 +1,32 @@
 import wave
 import numpy as np
-import fire
+from pathlib import Path
+from typing import Union, Tuple
 
 from .interface.stretch import Stretch
 
-def validate_ratio(ratio):
+
+def validate_ratio(ratio: float) -> float:
+    """
+    Validates the given ratio. It must be in the range [0.25, 4.0]
+
+    :param ratio: The ratio to validate.
+    :return: The validated ratio.
+    :raises ValueError: If the ratio is not in the valid range.
+    """
     if not (0.25 <= ratio <= 4.0):
         raise ValueError("Ratio must be from 0.25 to 4.0!")
     return ratio
 
 
-def read_wave_file(filename):
+def read_wave_file(filename: Union[str, Path]) -> Tuple:
+    """
+    Reads a wave file and returns its parameters and samples.
+
+    :param filename: The path to the wave file.
+    :return: A tuple containing the parameters and samples of the wave file.
+    """
+    filename = str(filename)  # convert to string if it's a Path object
     with wave.open(filename, "rb") as infile:
         params = infile.getparams()
         nchannels, sampwidth, framerate, nframes = params[:4]
@@ -20,13 +36,35 @@ def read_wave_file(filename):
     return params, samples
 
 
-def write_wave_file(filename, params, output_samples, num_samples):
+def write_wave_file(filename: Union[str, Path], params, output_samples, num_samples):
+    """
+    Writes the output samples to a wave file.
+
+    :param filename: The path to the output wave file.
+    :param params: The parameters of the wave file.
+    :param output_samples: The output samples to write.
+    :param num_samples: The number of samples to write.
+    """
+    filename = str(filename)  # convert to string if it's a Path object
     with wave.open(filename, "wb") as outfile:
         outfile.setparams(params)
         outfile.writeframes(output_samples[:num_samples].tobytes())
 
 
-def process_audio(infilename, outfilename, ratio=1.0, silence_ratio=0.0):
+def process_audio(
+    infilename: Union[str, Path],
+    outfilename: Union[str, Path],
+    ratio: float = 1.0,
+    silence_ratio: float = 0.0,
+):
+    """
+    Processes an audio file.
+
+    :param infilename: The path to the input audio file.
+    :param outfilename: The path to the output audio file.
+    :param ratio: The ratio to use for processing. Defaults to 1.0.
+    :param silence_ratio: The silence ratio to use for processing. Defaults to 0.0.
+    """
     ratio = validate_ratio(ratio)
     silence_ratio = silence_ratio or ratio
     silence_ratio = validate_ratio(silence_ratio)
@@ -39,11 +77,3 @@ def process_audio(infilename, outfilename, ratio=1.0, silence_ratio=0.0):
     write_wave_file(outfilename, params, output_samples, num_samples)
 
     stretcher.deinit()
-
-
-def main():
-    fire.Fire(process_audio)
-
-
-if __name__ == "__main__":
-    main()
