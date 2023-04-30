@@ -18,11 +18,12 @@ jobs:
         submodules: true
     - name: Install build-essential
       run: sudo apt-get install build-essential
+    - name: Create Linux interface directory
+      run: mkdir -p src/audiostretchy/interface/linux/
     - name: Compile stretch.c
       shell: bash {0}
       run: |
         gcc -fPIC -shared -o _stretch.so vendors/stretch/stretch.c
-        mkdir -p src/audiostretchy/interface/linux
         mv _stretch.so src/audiostretchy/interface/linux/
         ls -l src/audiostretchy/interface/linux/
     - name: Archive production artifacts
