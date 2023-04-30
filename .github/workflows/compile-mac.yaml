@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile-mac:
@@ -22,17 +22,8 @@ jobs:
         mkdir -p src/audiostretchy/interface/mac
         mv _stretch.dylib src/audiostretchy/interface/mac/
         ls -l src/audiostretchy/interface/mac/
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@v2
+    - name: Commit and push if changed
+      uses: EndBug/add-and-commit@v7
       with:
-        name: compiled-files-macos
-        path: ./src/audiostretchy/interface/mac/
-    - name: Download and verify artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: compiled-files-macos
-        path: ./artifacts/
-    - name: Verify artifact contents
-      run: |
-        mkdir -p artifacts/src/audiostretchy/interface/mac/
-        ls -l artifacts/src/audiostretchy/interface/mac/
+        message: "Update compiled files"
+        add: 'src/audiostretchy/interface/mac/_stretch.dylib'
