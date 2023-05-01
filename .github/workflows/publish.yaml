@@ -19,6 +19,9 @@ jobs:
           pip install build
       - name: Build wheel
         run: python -m build
+      - name: Identify Wheel File
+        id: wheel_info
+        run: echo "::set-output name=wheel_file::$(ls dist/*.whl)"
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -35,7 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/audiostretchy-*.whl
+          asset_path: ${{ steps.wheel_info.outputs.wheel_file }}
           asset_name: audiostretchy-${{ github.ref }}.whl
           asset_content_type: application/octet-stream
       - name: Publish to PyPi
