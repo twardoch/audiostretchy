@@ -38,9 +38,9 @@ coverage.xml
 .pytest_cache/
 
 # Build and docs folder/files
-build/*
-dist/*
-sdist/*
+#build/*
+#dist/*
+#sdist/*
 docs/api/*
 docs/_rst/*
 docs/_build/*
