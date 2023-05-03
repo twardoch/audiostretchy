@@ -87,12 +87,12 @@ class AudioStretch:
             or ratio > 2.0
             or (silence_mode and (gap_ratio < 0.5 or gap_ratio > 2.0))
         ):
-            flags |= Stretch.STRETCH_DUAL_FLAG
+            flags |= TDHSAudioStretch.STRETCH_DUAL_FLAG
 
         if (fast_detection or self.framerate >= 32000) and not normal_detection:
-            flags |= Stretch.STRETCH_FAST_FLAG
+            flags |= TDHSAudioStretch.STRETCH_FAST_FLAG
 
-        stretcher = Stretch(min_period, max_period, self.nchannels, flags)
+        stretcher = TDHSAudioStretch(min_period, max_period, self.nchannels, flags)
 
         if silence_mode:
             non_silence_frames = 0
