@@ -9,11 +9,6 @@ on:
 permissions:
   contents: write
 
-env:
-  LIB_DIR_LINUX: 'src/audiostretchy/interface/linux'
-  LIB_DIR_MAC: 'src/audiostretchy/interface/mac'
-  LIB_DIR_WIN: 'src/audiostretchy/interface/win'
-
 jobs:
   compile:
     runs-on: ${{ matrix.os }}
@@ -23,13 +18,13 @@ jobs:
         include:
           - os: ubuntu-latest
             lib_file: '_stretch.so'
-            lib_dir: ${{ env.LIB_DIR_LINUX }}
+            lib_dir: 'src/audiostretchy/interface/linux/'
           - os: macos-latest
             lib_file: '_stretch.dylib'
-            lib_dir: ${{ env.LIB_DIR_MAC }}
+            lib_dir: 'src/audiostretchy/interface/mac/'
           - os: windows-latest
             lib_file: '_stretch.dll'
-            lib_dir: ${{ env.LIB_DIR_WIN }}
+            lib_dir: 'src/audiostretchy/interface/win/'
     steps:
       - uses: actions/checkout@v2
         with:
