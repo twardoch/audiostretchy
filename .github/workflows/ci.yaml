@@ -26,7 +26,7 @@ jobs:
             lib_file: '_stretch.dll'
             lib_dir: 'src/audiostretchy/interface/win/'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       - name: Compile and Move
@@ -42,12 +42,12 @@ jobs:
             mkdir -p ${{ matrix.lib_dir }}/
             mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
           elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            powershell "cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c"
-            powershell "New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force"
-            powershell "Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force"
+            cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c
+            New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
+            Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
           fi
       - name: Commit and push if changed
-        uses: EndBug/add-and-commit@v7
+        uses: EndBug/add-and-commit@v9
         with:
           message: 'Update compiled lib'
           add: ${{ matrix.lib_dir }}${{ matrix.lib_file }}
@@ -57,9 +57,9 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: '3.10'
       - name: Install dependencies
