@@ -35,12 +35,14 @@ else:
 stretch_lib = ctypes.cdll.LoadLibrary(str(lib_path))
 
 
-class Stretch:
+class TDHSAudioStretch:
     """
     The Stretch class is a Python binding for the _stretch library, providing an interface
     to time-stretch audio signals without changing their pitch.
     """
-
+    STRETCH_FAST_FLAG = 0x1
+    STRETCH_DUAL_FLAG = 0x2
+    
     def __init__(self, shortest_period: int, longest_period: int, num_chans: int, flags: int) -> None:
         """
         Initialize the stretching context with the given parameters.
@@ -101,7 +103,7 @@ class Stretch:
         """
         return self.stretch_output_capacity(self.handle, max_num_samples, max_ratio)
 
-    def samples(self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float) -> int:
+    def process_samples(self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float) -> int:
         """
         Process the samples with a specified ratio.
 

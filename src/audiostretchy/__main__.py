@@ -2,11 +2,11 @@
 from pathlib import Path
 
 import fire
-from .stretch import process_audio
+from .stretch import stretch_wav
 
 def cli():
     fire.core.Display = lambda lines, out: print(*lines, file=out)
-    fire.Fire(process_audio)
+    fire.Fire(stretch_wav)
 
 if __name__ == "__main__":
     cli()
