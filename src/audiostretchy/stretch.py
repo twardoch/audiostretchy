@@ -1,4 +1,3 @@
-
 import wave
 import numpy as np
 from pathlib import Path
@@ -7,7 +6,7 @@ from .interface.tdhs import TDHSAudioStretch
 
 
 class AudioStretch:
-    def __init__(self):
+    def __init__(self, ext=False):
         self.pcm = None
         self.nchannels = 1
         self.sampwidth = 2
@@ -15,12 +14,15 @@ class AudioStretch:
         self.nframes = 0
         self.in_samples = None
         self.samples = None
+        self.ext = ext
 
     def open_wav(self, path: Union[str, Path] = None, file: BinaryIO = None):
-        if file: 
+        if file:
             wav = file
-        elif path and Path(path).is_file(): 
+        elif path and Path(path).is_file():
             wav = str(path)
+        else:
+            raise FileNotFoundError(f"{path} file not found")
         with wave.open(wav, "rb") as wav_file:
             self.nchannels = wav_file.getnchannels()
             self.sampwidth = wav_file.getsampwidth()
@@ -32,7 +34,7 @@ class AudioStretch:
     def save_wav(self, path: Union[str, Path] = None, file: BinaryIO = None):
         if file:
             wav = file
-        elif path: 
+        elif path:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             wav = str(path)
         self.pcm_encode()
@@ -61,7 +63,16 @@ class AudioStretch:
 
         return 10.0 * np.log10(rms_sum / samples / (32768.0 * 32767.0 * 0.5))
 
-    def stretch_samples(
+    def resample(self, framerate):
+        if framerate > 0 and framerate != self.framerate:
+            import soxr
+
+            self.samples = soxr.resample(
+                self.samples, self.framerate, framerate, quality="VHQ"
+            )
+            self.framerate = framerate
+
+    def stretch(
         self,
         ratio=1.0,
         gap_ratio=0.0,
@@ -132,7 +143,6 @@ class AudioStretch:
         stretcher.deinit()
 
 
-
 def stretch_wav(
     input_wav,
     output_wav,
@@ -145,10 +155,11 @@ def stretch_wav(
     dual_force=False,
     fast_detection=False,
     normal_detection=False,
+    sample_rate=0,
 ):
     audio_stretch = AudioStretch()
     audio_stretch.open_wav(input_wav)
-    audio_stretch.stretch_samples(
+    audio_stretch.stretch(
         ratio,
         gap_ratio,
         upper_freq,
@@ -159,4 +170,5 @@ def stretch_wav(
         fast_detection,
         normal_detection,
     )
+    audio_stretch.resample(sample_rate)
     audio_stretch.save_wav(output_wav)
