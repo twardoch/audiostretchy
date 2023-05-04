@@ -1,12 +1,24 @@
+from wave import Wave_read, Wave_write
 import wave
 import numpy as np
+from io import BytesIO
 from pathlib import Path
-from typing import Union, Tuple, BinaryIO
+from typing import Union, Tuple, BinaryIO, Optional
 from .interface.tdhs import TDHSAudioStretch
 
 
 class AudioStretch:
-    def __init__(self, ext=False):
+    """
+    Class to perform audio stretching operations.
+    """
+
+    def __init__(self, ext: bool = False):
+        """
+        Constructor for the AudioStretch class.
+
+        Args:
+            ext (bool): external flag, defaults to False.
+        """
         self.pcm = None
         self.nchannels = 1
         self.sampwidth = 2
@@ -16,42 +28,185 @@ class AudioStretch:
         self.samples = None
         self.ext = ext
 
-    def open_wav(self, path: Union[str, Path] = None, file: BinaryIO = None):
+    def open(
+        self,
+        path: Optional[Union[str, Path]] = None,
+        file: Optional[BinaryIO] = None,
+        format: Optional[str] = None,
+    ):
+        """
+        Open an audio file.
+
+        Args:
+            path (Union[str, Path], optional): Path to the audio file.
+            file (BinaryIO, optional): Binary I/O object of the audio file.
+            format (str, optional): The format of the audio file.
+        """
+        format_ext = None
+        audio_file = None
         if file:
-            wav = file
-        elif path and Path(path).is_file():
-            wav = str(path)
-        else:
-            raise FileNotFoundError(f"{path} file not found")
-        with wave.open(wav, "rb") as wav_file:
-            self.nchannels = wav_file.getnchannels()
-            self.sampwidth = wav_file.getsampwidth()
-            self.framerate = wav_file.getframerate()
-            self.nframes = wav_file.getnframes()
-            self.pcm = wav_file.readframes(self.nframes)
+            audio_file = file
+        elif path:
+            path = Path(path)
+            if not path.is_file():
+                raise FileNotFoundError(f"{str(path)} file not found")
+            format_ext = path.suffix.lower()[1:]
+            audio_file = open(path, "rb")
+        if audio_file:
+            if format == "mp3" or format_ext == "mp3":
+                self.open_mp3(audio_file)
+            elif format == "wav" or format_ext == "wav":
+                self.open_wav(audio_file)
+
+    def open_mp3(self, audio_file: BinaryIO):
+        """
+        Open a .mp3 audio file.
+
+        Args:
+            audio_file (BinaryIO): Binary I/O object of the audio file.
+        """
+        try:
+            import mp3
+
+            decoder = mp3.Decoder(audio_file)
+            with open(BytesIO(), "wb") as wav_io:
+                wav_file = Wave_write(wav_io)
+                wav_file.setnchannels(decoder.get_channels())
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(decoder.get_sample_rate())
+                wav_file.writeframes(decoder.read())
+            self.open_wav(wav_io)
+        except ImportError:
+            from pydub import AudioSegment
+
+            audio = AudioSegment.from_file(audio_file, format="mp3")
+            wav_io = BytesIO()
+            audio.export(wav_io, format="wav")
+            wav_io.seek(0)
+            self.open_wav(wav_io)
+
+    def open_wav(self, audio_file: BinaryIO):
+        """
+        Open a .wav audio file.
+
+        Args:
+            audio_file (BinaryIO): Binary I/O object of the audio file.
+        """
+        wav_file = Wave_read(audio_file)
+        self.nchannels = wav_file.getnchannels()
+        self.sampwidth = wav_file.getsampwidth()
+        self.framerate = wav_file.getframerate()
+        self.nframes = wav_file.getnframes()
+        self.pcm = wav_file.readframes(self.nframes)
+        wav_file.close()
+        audio_file.close()
         self.pcm_decode()
 
-    def save_wav(self, path: Union[str, Path] = None, file: BinaryIO = None):
+    def save(
+        self,
+        path: Optional[Union[str, Path]] = None,
+        file: Optional[BinaryIO] = None,
+        format: Optional[str] = None,
+    ):
+        """
+        Save the audio file.
+
+        Args:
+            path (Union[str, Path], optional): Path to save the audio file.
+            file (BinaryIO, optional): Binary I/O object to save the audio file.
+            format (str, optional): The format of the audio file.
+        """
+        format_ext = None
+        audio_file = None
         if file:
-            wav = file
+            audio_file = file
         elif path:
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-            wav = str(path)
+            path = Path(path)
+            format_ext = path.suffix.lower()[1:]
+            audio_file = open(path, "wb")
+        if audio_file:
+            if format == "mp3" or format_ext == "mp3":
+                self.save_mp3(audio_file)
+            elif format == "wav" or format_ext == "wav":
+                self.save_wav(audio_file)
+
+    def save_mp3(self, audio_file: BinaryIO, bit_rate: int = 128, quality: int = 5):
+        """
+        Save the audio file in .mp3 format.
+
+        Args:
+            audio_file (BinaryIO): Binary I/O object to save the audio file.
+            bit_rate (int): Bit rate of the audio file.
+            quality (int): Quality of the audio file.
+        """
         self.pcm_encode()
-        with wave.open(wav, "wb") as wav_file:
-            wav_file.setnchannels(self.nchannels)
-            wav_file.setsampwidth(self.sampwidth)
-            wav_file.setframerate(self.framerate)
-            wav_file.writeframes(self.pcm)
+        try:
+            import mp3
+
+            encoder = mp3.Encoder(audio_file)
+            encoder.set_bit_rate(bit_rate)
+            encoder.set_sample_rate(self.framerate)
+            encoder.set_channels(self.nchannels)
+            encoder.set_quality(quality)
+            encoder.set_mod(
+                mp3.MODE_STEREO if nchannels == 2 else mp3.MODE_SINGLE_CHANNEL
+            )
+            encoder.write(self.pcm)
+        except ImportError:
+            from pydub import AudioSegment
+
+            wav_io = BytesIO()
+            self.save_wav(wav_io, close=False)
+            wav_io.seek(0)
+            audio = AudioSegment.from_file(wav_io, format="wav")
+            wav_io.close()
+            audio.export(audio_file, format="mp3", bitrate=f"{bit_rate}k")
+
+    def save_wav(self, audio_file: BinaryIO, close: bool = True):
+        """
+        Save the audio file in .wav format.
+
+        Args:
+            audio_file (BinaryIO): Binary I/O object to save the audio file.
+            close (bool): Flag to close the audio file after saving. Defaults to True.
+        """
+        self.pcm_encode()
+        wav_file = Wave_write(audio_file)
+        wav_file.setnchannels(self.nchannels)
+        wav_file.setsampwidth(self.sampwidth)
+        wav_file.setframerate(self.framerate)
+        wav_file.writeframes(self.pcm)
+        if not close:
+            return wav_file
+        wav_file.close()
+        audio_file.close()
+        return True
 
     def pcm_decode(self):
+        """
+        Decode PCM audio data.
+        """
         self.in_samples = np.frombuffer(self.pcm, dtype=np.int16)
         self.samples = self.in_samples
 
     def pcm_encode(self):
+        """
+        Encode audio data to PCM.
+        """
         self.pcm = self.samples.tobytes()
 
-    def rms_level_dB(self, audio, samples, channels):
+    def rms_level_dB(self, audio: np.ndarray, samples: int, channels: int) -> float:
+        """
+        Calculate the Root Mean Square (RMS) level in decibels (dB).
+
+        Args:
+            audio (np.ndarray): Audio data.
+            samples (int): Number of samples.
+            channels (int): Number of audio channels.
+
+        Returns:
+            float: RMS level in dB.
+        """
         rms_sum = 0.0
 
         for i in range(samples):
@@ -63,7 +218,13 @@ class AudioStretch:
 
         return 10.0 * np.log10(rms_sum / samples / (32768.0 * 32767.0 * 0.5))
 
-    def resample(self, framerate):
+    def resample(self, framerate: int):
+        """
+        Resample the audio.
+
+        Args:
+            framerate (int): Target framerate for resampling.
+        """
         if framerate > 0 and framerate != self.framerate:
             import soxr
 
@@ -74,16 +235,30 @@ class AudioStretch:
 
     def stretch(
         self,
-        ratio=1.0,
-        gap_ratio=0.0,
-        upper_freq=333,
-        lower_freq=55,
-        buffer_ms=25,
-        threshold_gap_db=-40,
-        dual_force=False,
-        fast_detection=False,
-        normal_detection=False,
+        ratio: float = 1.0,
+        gap_ratio: float = 0.0,
+        upper_freq: int = 333,
+        lower_freq: int = 55,
+        buffer_ms: float = 25,
+        threshold_gap_db: float = -40,
+        dual_force: bool = False,
+        fast_detection: bool = False,
+        normal_detection: bool = False,
     ):
+        """
+        Stretch the audio.
+
+        Args:
+            ratio (float): Stretch ratio. Defaults to 1.0.
+            gap_ratio (float): Gap ratio. Defaults to 0.0.
+            upper_freq (int): Upper frequency limit. Defaults to 333.
+            lower_freq (int): Lower frequency limit. Defaults to 55.
+            buffer_ms (float): Buffer size in milliseconds. Defaults to 25.
+            threshold_gap_db (float): Threshold gap in dB. Defaults to -40.
+            dual_force (bool): Flag for dual force. Defaults to False.
+            fast_detection (bool): Flag for fast detection. Defaults to False.
+            normal_detection (bool): Flag for normal detection. Defaults to False.
+        """
         gap_ratio = gap_ratio or ratio
         flags = 0
         silence_mode = gap_ratio and gap_ratio != ratio
@@ -143,9 +318,9 @@ class AudioStretch:
         stretcher.deinit()
 
 
-def stretch_wav(
-    input_wav,
-    output_wav,
+def stretch_audio(
+    input_path,
+    output_path,
     ratio=1.0,
     gap_ratio=0.0,
     upper_freq=333,
@@ -158,7 +333,7 @@ def stretch_wav(
     sample_rate=0,
 ):
     audio_stretch = AudioStretch()
-    audio_stretch.open_wav(input_wav)
+    audio_stretch.open(input_path)
     audio_stretch.stretch(
         ratio,
         gap_ratio,
@@ -171,4 +346,4 @@ def stretch_wav(
         normal_detection,
     )
     audio_stretch.resample(sample_rate)
-    audio_stretch.save_wav(output_wav)
+    audio_stretch.save(output_path)

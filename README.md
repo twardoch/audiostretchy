@@ -1,17 +1,18 @@
 # AudioStretchy
 
-AudioStretchy is a Python library that allows you to time-stretch audio signals without changing their pitch. It is a wrapper around the [audio-stretch](https://github.com/dbry/audio-stretch) library by David Bryant, which implements a sophisticated time-stretching algorithm for high-quality results. 
+AudioStretchy is a Python library that allows you to time-stretch audio signals without changing their pitch. It is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) library by David Bryant, which implements a sophisticated time-stretching algorithm for high-quality results. 
 
-Version: 1.1.2
+Version: 1.2.0
 
 ## Features
 
 - Time stretching of audio files without changing their pitch
-- Supports WAV files
+- Supports WAV files, and optionally MP3 files
 - Adjustable stretching ratio from 0.25 to 4.0
 - Cross-platform: Windows, macOS, and Linux
+- Optional resampling
 
-Adapted from the [original audio-stretch C library](https://github.com/dbry/audio-stretch): 
+The following explanation is adapted from the [original audio-stretch C library](https://github.com/dbry/audio-stretch): 
 
 Time-domain harmonic scaling (TDHS) is a method for time-scale
 modification of speech (or other audio signals), allowing the apparent
@@ -45,20 +46,33 @@ them correctly (by resampling), but it is possible that some applications
 will barf on them. They can also be resampled to a standard rate using
 [audio-resampler](https://github.com/dbry/audio-resampler) by David Bryant. 
 
-The Python package does not expose all command-line options of the original library. 
+_Note: The Python package does not expose all command-line options of the original library._
 
 ## Installation
 
-Install AudioStretchy using pip:
+### Simple installation
+
+To be able to stretch and resample WAV and MP3 files, install AudioStretchy using `pip` like so:
 
 ```
-python3 -m pip install audiostretchy
+pip install audiostretchy[all]
 ```
 
-or
+### Efficient installation
+
+To only be able to stretch WAV files, install AudioStretchy without dependencies like so: 
+
 
 ```
-python3 -m pip install git+https://github.com/twardoch/audiostretchy
+pip install audiostretchy
+```
+
+### Development installation
+
+To install the development version, use:
+
+```
+python3 -m pip install git+https://github.com/twardoch/audiostretchy#egg=audiostretchy[all]
 ```
 
 ## Usage
@@ -66,59 +80,51 @@ python3 -m pip install git+https://github.com/twardoch/audiostretchy
 ### CLI
 
 ```
-audiostretchy INFILENAME OUTFILENAME <flags>
+audiostretchy INPUT_WAV OUTPUT_WAV <flags>
 
 POSITIONAL ARGUMENTS
-    INFILENAME
-        The path to the input WAV file.
-    OUTFILENAME
-        The path to the output WAV file.
+    INPUT_WAV
+    OUTPUT_WAV
 
 FLAGS
     -r, --ratio=RATIO
-        Type: float
         Default: 1.0
-        The ratio to use for processing. Defaults to 1.0.
-    -s, --silence_ratio=SILENCE_RATIO
-        Type: float
+    -g, --gap_ratio=GAP_RATIO
         Default: 0.0
-        The silence ratio to use for processing if different from ratio
+    -u, --upper_freq=UPPER_FREQ
+        Default: 333
+    -l, --lower_freq=LOWER_FREQ
+        Default: 55
+    -b, --buffer_ms=BUFFER_MS
+        Default: 25
+    -t, --threshold_gap_db=THRESHOLD_GAP_DB
+        Default: -40
+    -d, --dual_force=DUAL_FORCE
+        Default: False
+    -f, --fast_detection=FAST_DETECTION
+        Default: False
+    -n, --normal_detection=NORMAL_DETECTION
+        Default: False
+    -s, --sample_rate=SAMPLE_RATE
+        Default: 0
 ```
 
 ### Python
 
 ```python
-from audiostretchy.stretch import process_audio
+from audiostretchy.stretch import stretch_audio
 
-input_file = "input.wav"
-output_file = "output.wav"
-stretch_ratio = 1.1
-
-process_audio(input_file, output_file, ratio=stretch_ratio)
+stretch_audio("input.wav", "output.wav", ratio=ratio)
 ```
 
 In this example, the `input.wav` file will be time-stretched by a factor of 1.1, meaning it will be 10% longer, and the result will be saved in the `output.wav` file.
 
-## API
+For advanced usage, you can use the `AudioStretch` class (docs to be provided).
 
-The main function to use in AudioStretchy is `process_audio` in `audiostretchy.stretch`:
-
-```python
-process_audio(
-    infilename: Union[str, Path],
-    outfilename: Union[str, Path],
-    ratio: float = 1.0,
-    silence_ratio: float = 0.0,
-)
-```
-
-- `infilename`: The path to the input audio file (WAV format).
-- `outfilename`: The path to the output audio file (WAV format).
-- `ratio`: The stretching ratio. Must be between 0.25 and 4.0. Defaults to 1.0 (no stretching).
-- `silence_ratio`: The silence ratio to use for processing. Must be between 0.25 and 4.0. Defaults to 0.0 (use the same ratio as `ratio`).
 
 ## License
 
 - [Original C library code](https://github.com/dbry/audio-stretch): Copyright (c) 2022 David Bryant
 - [Python code](https://github.com/twardoch/audiostretchy): Copyright (c) 2023 Adam Twardoch
+- Written with assistance from GPT-4
 - Licensed under the [BSD-3-Clause license](./LICENSE.txt)
