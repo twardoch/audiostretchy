@@ -2,15 +2,15 @@
 
 AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
-Version: 1.2.1
+Version: 1.2.2
 
 ## Features
 
-- Time stretching of audio files without changing their pitch
-- Supports WAV files, and optionally MP3 files
+- Fast, high-quality time stretching of audio files without changing their pitch
 - Adjustable stretching ratio from 0.25 to 4.0
 - Cross-platform: Windows, macOS, and Linux
-- Optional resampling
+- Supports WAV files and file-like objects. With `[all]` installation, also supports MP3 files and file-like objects
+- With `[all]` installation, also supports resampling
 
 **Time-domain harmonic scaling (TDHS)** is a method for time-scale modification of speech (or other audio signals), allowing the apparent rate of speech articulation to be changed without affecting the pitch-contour and the time-evolution of the formant structure. TDHS differs from other time-scale modification algorithms in that time-scaling operations are performed in the time domain (not the frequency domain).
 
@@ -20,7 +20,7 @@ The library gives very good results with speech recordings, especially with mode
 
 ## Installation
 
-### Simple installation
+### Full installation
 
 To be able to **stretch** and **resample** both **WAV** and **MP3** files, install AudioStretchy using `pip` like so:
 
@@ -28,7 +28,20 @@ To be able to **stretch** and **resample** both **WAV** and **MP3** files, insta
 pip install audiostretchy[all]
 ```
 
-### Efficient installation
+This installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux. 
+
+This also installs optional dependencies: 
+
+- for MP3 support: [pydub](https://pypi.org/project/pydub/) on macOS, [pymp3](https://pypi.org/project/pymp3/) on Linux and Windows
+- for resampling: [soxr](https://pypi.org/project/soxr/)
+
+On macOS, you also need to install [HomeBrew](https://brew.sh/) and then in Terminal run: 
+
+```bash
+brew install ffmpeg
+```
+
+### Minimal installation
 
 To only be able to **stretch** **WAV** files (no resampling, no MP3 support), install AudioStretchy with minimal dependencies like so: 
 
@@ -36,7 +49,9 @@ To only be able to **stretch** **WAV** files (no resampling, no MP3 support), in
 pip install audiostretchy
 ```
 
-### Development installation
+This only installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux. 
+
+### Full development installation
 
 To install the development version, use:
 
@@ -96,7 +111,7 @@ For advanced usage, you can use the `AudioStretch` class that lets you open and 
 from audiostretchy.stretch import AudioStretch
 
 audio_stretch = AudioStretch()
-audio_stretch.open(file=MP3DataAsBytesIO, format="mp3")
+audio_stretch.open(file=MP3DataAsBytesIO, format="mp3") # Needs [all] installation for MP3 support
 audio_stretch.stretch(
     ratio=1.1,
     gap_ratio=1.2,
@@ -108,7 +123,7 @@ audio_stretch.stretch(
     fast_detection=False,
     normal_detection=False,
 )
-audio_stretch.resample(sample_rate=44100)
+audio_stretch.resample(sample_rate=44100) # Needs [all] installation for soxr support
 audio_stretch.save(file=WAVDataAsBytesIO, format="wav")
 ```
 
