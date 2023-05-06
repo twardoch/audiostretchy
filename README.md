@@ -2,7 +2,7 @@
 
 AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
-Version: 1.2.2
+Version: 1.2.3
 
 ## Features
 
@@ -74,25 +74,25 @@ POSITIONAL ARGUMENTS
 
 FLAGS
     -r, --ratio=RATIO
-        The stretch ratio, where values greater than 1.0 will extend the audio and values less than 1.0 will shorten the audio. Default is 1.0 = no stretching.
+        The stretch ratio, where values greater than 1.0 will extend the audio and values less than 1.0 will shorten the audio. From 0.5 to 2.0, or with `-d` from 0.25 to 4.0. Default is 1.0 = no stretching.
     -g, --gap_ratio=GAP_RATIO
-        The stretch ratio for gaps (silence) in the audio. Default is 0.0 = use ratio.
+        The stretch ratio for gaps (silence) in the audio. Default is 0.0 = uses ratio.
     -u, --upper_freq=UPPER_FREQ
         The upper frequency limit for period detection in Hz. Default is 333 Hz.
     -l, --lower_freq=LOWER_FREQ
         The lower frequency limit. Default is 55 Hz.
     -b, --buffer_ms=BUFFER_MS
-        The buffer size in milliseconds for processing the audio in chunks. Default is 25 ms.
+        The buffer size in milliseconds for processing the audio in chunks (useful with `-g`). Default is 25 ms.
     -t, --threshold_gap_db=THRESHOLD_GAP_DB
-        The threshold level in dB to determine if a section of audio is considered a gap (silence). Default is -40 dB.
-    -d, --dual_force=DUAL_FORCE
-        If set, forces the algorithm to operate in dual-force mode, which may improve the quality of the stretched audio but may also increase processing time.
+        The threshold level in dB to determine if a section of audio is considered a gap (for `-g`). Default is -40 dB.
+    -d, --double_range=DOUBLE_RANGE
+        If set, doubles the min/max range of stretching.
     -f, --fast_detection=FAST_DETECTION
         If set, enables fast period detection, which may speed up processing but reduce the quality of the stretched audio.
     -n, --normal_detection=NORMAL_DETECTION
         If set, forces the algorithm to use normal period detection instead of fast period detection.
     -s, --sample_rate=SAMPLE_RATE
-        The target sample rate for resampling the stretched audio in Hz. Default is 0 = use sample rate of the input audio.
+        The target sample rate for resampling the stretched audio in Hz (if installed with `[all]`). Default is 0 = use sample rate of the input audio.
 ```
 
 ### Python
