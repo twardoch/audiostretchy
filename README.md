@@ -2,7 +2,7 @@
 
 AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
-_Version: **1.2.4**_
+_Version: **1.2.5**_
 
 ## Features
 
@@ -17,6 +17,16 @@ _Version: **1.2.4**_
 The core functionality of this package is provided by David Bryant’s excellent [audio-stretch C library](https://github.com/dbry/audio-stretch) that performs fast, high-quality TDHS on WAV in the ratio range of 0.25 (4× slower) to 4.0 (4× faster). 
 
 The library gives very good results with speech recordings, especially with modest stretching at the ratio between 0.9 (10% slower) and 1.1 (10% faster). AudioStretchy is a Python wrapper around that library. The Python package also offers some additional, optional functionality: supports MP3 (in addition to WAV), and allows you to preform resampling.
+
+## Demo
+
+Below are links to a short audio file (as WAV and MP3), with the same file stretched at 1.2 (20% slower):
+
+| Input                                                                              | Stretched                                                                                  |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [`audio.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.wav) | [`audio-1.2.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.wav) |
+| [`audio.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.mp3) | [`audio-1.2.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.mp3) |
+
 
 ## Installation
 
