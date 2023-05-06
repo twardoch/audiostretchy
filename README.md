@@ -1,8 +1,8 @@
 # AudioStretchy
 
-AudioStretchy is a Python library that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
+AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
-Version: 1.2.0
+Version: 1.2.1
 
 ## Features
 
@@ -12,47 +12,17 @@ Version: 1.2.0
 - Cross-platform: Windows, macOS, and Linux
 - Optional resampling
 
-The following explanation is adapted from the [original audio-stretch C library](https://github.com/dbry/audio-stretch): 
+**Time-domain harmonic scaling (TDHS)** is a method for time-scale modification of speech (or other audio signals), allowing the apparent rate of speech articulation to be changed without affecting the pitch-contour and the time-evolution of the formant structure. TDHS differs from other time-scale modification algorithms in that time-scaling operations are performed in the time domain (not the frequency domain).
 
-Time-domain harmonic scaling (TDHS) is a method for time-scale
-modification of speech (or other audio signals), allowing the apparent
-rate of speech articulation to be changed without affecting the
-pitch-contour and the time-evolution of the formant structure. TDHS
-differs from other time-scale modification algorithms in that
-time-scaling operations are performed in the time domain (not the
-frequency domain).
+The core functionality of this package is provided by David Bryant’s excellent [audio-stretch C library](https://github.com/dbry/audio-stretch) that performs fast, high-quality TDHS on WAV in the ratio range of 0.25 (4× slower) to 4.0 (4× faster). 
 
-This project is a Python wrapper around a a TDHS library to utilize it with standard WAV files. 
-
-There are two effects possible with TDHS and the audio-stretch demo. The
-first is the more obvious mentioned above of changing the duration (or
-speed) of a speech (or other audio) sample without modifying its pitch.
-The other effect is similar, but after applying the duration change we
-change the sampling rate in a complimentary manner to restore the original
-duration and timing, which then results in the pitch being altered.
-
-So when a ratio is supplied to the audio-stretch program, the default
-operation is for the total duration of the audio file to be scaled by
-exactly that ratio (0.5X to 2.0X), with the pitches remaining constant.
-If the option to scale the sample-rate proportionally is specified (-s)
-then the total duration and timing of the audio file will be preserved,
-but the pitches will be scaled by the specified ratio instead. This is
-useful for creating a "helium voice" effect and lots of other fun stuff.
-
-Note that unless ratios of exactly 0.5 or 2.0 are used with the -s option,
-non-standard sampling rates will probably result. Many programs will still
-properly play these files, and audio editing programs will likely import
-them correctly (by resampling), but it is possible that some applications
-will barf on them. They can also be resampled to a standard rate using
-[audio-resampler](https://github.com/dbry/audio-resampler) by David Bryant. 
-
-_Note: The Python package does not expose all command-line options of the original library._
+The library gives very good results with speech recordings, especially with modest stretching at the ratio between 0.9 (10% slower) and 1.1 (10% faster). AudioStretchy is a Python wrapper around that library. The Python package also offers some additional, optional functionality: supports MP3 (in addition to WAV), and allows you to preform resampling.
 
 ## Installation
 
 ### Simple installation
 
-To be able to stretch and resample WAV and MP3 files, install AudioStretchy using `pip` like so:
+To be able to **stretch** and **resample** both **WAV** and **MP3** files, install AudioStretchy using `pip` like so:
 
 ```
 pip install audiostretchy[all]
@@ -60,8 +30,7 @@ pip install audiostretchy[all]
 
 ### Efficient installation
 
-To only be able to stretch WAV files, install AudioStretchy without dependencies like so: 
-
+To only be able to **stretch** **WAV** files (no resampling, no MP3 support), install AudioStretchy with minimal dependencies like so: 
 
 ```
 pip install audiostretchy
@@ -83,30 +52,32 @@ python3 -m pip install git+https://github.com/twardoch/audiostretchy#egg=audiost
 audiostretchy INPUT_WAV OUTPUT_WAV <flags>
 
 POSITIONAL ARGUMENTS
-    INPUT_WAV
-    OUTPUT_WAV
+    INPUT_PATH
+        The path to the input WAV or MP3 audio file.
+    OUTPUT_PATH
+        The path to save the stretched WAV or MP3 audio file.
 
 FLAGS
     -r, --ratio=RATIO
-        Default: 1.0
+        The stretch ratio, where values greater than 1.0 will extend the audio and values less than 1.0 will shorten the audio. Default is 1.0 = no stretching.
     -g, --gap_ratio=GAP_RATIO
-        Default: 0.0
+        The stretch ratio for gaps (silence) in the audio. Default is 0.0 = use ratio.
     -u, --upper_freq=UPPER_FREQ
-        Default: 333
+        The upper frequency limit for period detection in Hz. Default is 333 Hz.
     -l, --lower_freq=LOWER_FREQ
-        Default: 55
+        The lower frequency limit. Default is 55 Hz.
     -b, --buffer_ms=BUFFER_MS
-        Default: 25
+        The buffer size in milliseconds for processing the audio in chunks. Default is 25 ms.
     -t, --threshold_gap_db=THRESHOLD_GAP_DB
-        Default: -40
+        The threshold level in dB to determine if a section of audio is considered a gap (silence). Default is -40 dB.
     -d, --dual_force=DUAL_FORCE
-        Default: False
+        If set, forces the algorithm to operate in dual-force mode, which may improve the quality of the stretched audio but may also increase processing time.
     -f, --fast_detection=FAST_DETECTION
-        Default: False
+        If set, enables fast period detection, which may speed up processing but reduce the quality of the stretched audio.
     -n, --normal_detection=NORMAL_DETECTION
-        Default: False
+        If set, forces the algorithm to use normal period detection instead of fast period detection.
     -s, --sample_rate=SAMPLE_RATE
-        Default: 0
+        The target sample rate for resampling the stretched audio in Hz. Default is 0 = use sample rate of the input audio.
 ```
 
 ### Python
@@ -114,12 +85,32 @@ FLAGS
 ```python
 from audiostretchy.stretch import stretch_audio
 
-stretch_audio("input.wav", "output.wav", ratio=ratio)
+stretch_audio("input.wav", "output.wav", ratio=1.1)
 ```
 
 In this example, the `input.wav` file will be time-stretched by a factor of 1.1, meaning it will be 10% longer, and the result will be saved in the `output.wav` file.
 
-For advanced usage, you can use the `AudioStretch` class (docs to be provided).
+For advanced usage, you can use the `AudioStretch` class that lets you open and save files provided as paths or as file-like BytesIO objects: 
+
+```python
+from audiostretchy.stretch import AudioStretch
+
+audio_stretch = AudioStretch()
+audio_stretch.open(file=MP3DataAsBytesIO, format="mp3")
+audio_stretch.stretch(
+    ratio=1.1,
+    gap_ratio=1.2,
+    upper_freq=333,
+    lower_freq=55,
+    buffer_ms=25,
+    threshold_gap_db=-40,
+    dual_force=False,
+    fast_detection=False,
+    normal_detection=False,
+)
+audio_stretch.resample(sample_rate=44100)
+audio_stretch.save(file=WAVDataAsBytesIO, format="wav")
+```
 
 
 ## License
