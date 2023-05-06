@@ -1,6 +1,6 @@
 # AudioStretchy
 
-AudioStretchy is a Python library that allows you to time-stretch audio signals without changing their pitch. It is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) library by David Bryant, which implements a sophisticated time-stretching algorithm for high-quality results. 
+AudioStretchy is a Python library that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
 Version: 1.2.0
 
