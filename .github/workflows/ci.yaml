@@ -40,22 +40,25 @@ jobs:
               id: check_file
               shell: bash
               run: |
-                  echo "::set-output name=file_exists::$(if [ -f "${{ matrix.lib_dir }}${{ matrix.lib_file }}" ]; then echo 'true'; else echo 'false'; fi)"
+                  echo "::set-output name=file_exists::$(if [ -f "${{ matrix.lib_dir }}${{ matrix.lib_file }}" ]; then echo 'false'; else echo 'true'; fi)"
             - name: Compile and Move (Ubuntu)
-              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'ubuntu-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' && steps.check_file.outputs.file_exists == 'true' && matrix.os == 'ubuntu-latest'
               run: |
                   sudo apt-get install build-essential
                   gcc -fPIC -O3 -shared -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c
                   mkdir -p ${{ matrix.lib_dir }}
                   mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
             - name: Compile and Move (macOS)
-              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'macos-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' && steps.check_file.outputs.file_exists == 'true' && matrix.os == 'macos-latest'
               run: |
                   gcc -shared -O3 -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c -arch x86_64 -arch arm64
                   mkdir -p ${{ matrix.lib_dir }}/
                   mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
             - name: Compile and Move (Windows)
-              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'windows-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' && steps.check_file.outputs.file_exists == 'true' && matrix.os == 'windows-latest'
+              uses: ilammy/msvc-dev-cmd@v1
+              arch: x64
+              spectre: false
               shell: pwsh
               run: |
                   cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
