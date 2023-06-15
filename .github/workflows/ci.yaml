@@ -42,20 +42,20 @@ jobs:
               run: |
                 if [[ ! -f "${{ matrix.lib_dir }}${{ matrix.lib_file }}" ]]; then echo "file_missing=true" >> $GITHUB_ENV; fi
             - name: Compile and Move (Ubuntu)
-              if: steps.check_submodule.outputs.submodule == 'true' || env.file_exists == 'true' && matrix.os == 'ubuntu-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true' && matrix.os == 'ubuntu-latest'
               run: |
                   sudo apt-get install build-essential
                   gcc -fPIC -O3 -shared -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c
                   mkdir -p ${{ matrix.lib_dir }}
                   mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
             - name: Compile and Move (macOS)
-              if: steps.check_submodule.outputs.submodule == 'true' || env.file_exists == 'true' && matrix.os == 'macos-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true' && matrix.os == 'macos-latest'
               run: |
                   gcc -shared -O3 -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c -arch x86_64 -arch arm64
                   mkdir -p ${{ matrix.lib_dir }}/
                   mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
             - name: Compile and Move (Windows)
-              if: steps.check_submodule.outputs.submodule == 'true' || env.file_exists == 'true' && matrix.os == 'windows-latest'
+              if: steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true' && matrix.os == 'windows-latest'
               uses: ilammy/msvc-dev-cmd@v1
               with: 
                 arch: x64
