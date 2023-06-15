@@ -53,7 +53,7 @@ jobs:
         if: steps.check_submodule.outputs.submodule == 'true' && matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c
+          cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
           New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
           Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
       - name: Commit and push if changed
