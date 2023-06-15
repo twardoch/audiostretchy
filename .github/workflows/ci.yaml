@@ -1,108 +1,113 @@
 name: Build, Compile and Publish
 on:
-  push:
-    branches: [main]
-    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
-  pull_request:
-  workflow_dispatch:
+    push:
+        branches: [main]
+        tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
+    pull_request:
+    workflow_dispatch:
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  compile:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            lib_file: '_stretch.so'
-            lib_dir: 'src/audiostretchy/interface/linux/'
-          - os: macos-latest
-            lib_file: '_stretch.dylib'
-            lib_dir: 'src/audiostretchy/interface/mac/'
-          - os: windows-latest
-            lib_file: '_stretch.dll'
-            lib_dir: 'src/audiostretchy/interface/win/'
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Check submodule changes
-        id: check_submodule
-        uses: dorny/paths-filter@v2
-        with:
-          filters: |
-            submodule:
-              - 'vendors/stretch/**'
-      - name: Compile and Move (Ubuntu)
-        if: steps.check_submodule.outputs.submodule == 'true' && matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get install build-essential
-          gcc -fPIC -O3 -shared -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c
-          mkdir -p ${{ matrix.lib_dir }}
-          mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
-      - name: Compile and Move (macOS)
-        if: steps.check_submodule.outputs.submodule == 'true' && matrix.os == 'macos-latest'
-        run: |
-          gcc -shared -O3 -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c -arch x86_64 -arch arm64
-          mkdir -p ${{ matrix.lib_dir }}/
-          mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
-      - name: Compile and Move (Windows)
-        if: steps.check_submodule.outputs.submodule == 'true' && matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
-          New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
-          Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
-      - name: Commit and push if changed
-        if: steps.check_submodule.outputs.submodule == 'true'
-        uses: EndBug/add-and-commit@v9
-        with:
-          message: 'Update compiled lib'
-          add: ${{ matrix.lib_dir }}${{ matrix.lib_file }}
+    compile:
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                include:
+                    - os: ubuntu-latest
+                      lib_file: '_stretch.so'
+                      lib_dir: 'src/audiostretchy/interface/linux/'
+                    - os: macos-latest
+                      lib_file: '_stretch.dylib'
+                      lib_dir: 'src/audiostretchy/interface/mac/'
+                    - os: windows-latest
+                      lib_file: '_stretch.dll'
+                      lib_dir: 'src/audiostretchy/interface/win/'
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  submodules: true
+            - name: Check submodule changes
+              id: check_submodule
+              uses: dorny/paths-filter@v2
+              with:
+                  filters: |
+                      submodule:
+                        - 'vendors/stretch/**'
+            - name: Check if destination file exists
+              id: check_file
+              shell: bash
+              run: |
+                  echo "::set-output name=file_exists::$(if [ -f "${{ matrix.lib_dir }}${{ matrix.lib_file }}" ]; then echo 'true'; else echo 'false'; fi)"
+            - name: Compile and Move (Ubuntu)
+              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'ubuntu-latest'
+              run: |
+                  sudo apt-get install build-essential
+                  gcc -fPIC -O3 -shared -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c
+                  mkdir -p ${{ matrix.lib_dir }}
+                  mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
+            - name: Compile and Move (macOS)
+              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'macos-latest'
+              run: |
+                  gcc -shared -O3 -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c -arch x86_64 -arch arm64
+                  mkdir -p ${{ matrix.lib_dir }}/
+                  mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
+            - name: Compile and Move (Windows)
+              if: steps.check_submodule.outputs.submodule == 'true' || steps.check_file.outputs.file_exists == 'false' && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                  cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
+                  New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
+                  Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
+            - name: Commit and push if changed
+              if: steps.check_submodule.outputs.submodule == 'true'
+              uses: EndBug/add-and-commit@v9
+              with:
+                  message: 'Update compiled lib'
+                  add: ${{ matrix.lib_dir }}${{ matrix.lib_file }}
 
-  build-and-publish:
-    needs: compile
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-      - name: Build wheel
-        run: python -m build
-      - name: Identify Wheel File
-        id: wheel_info
-        run: echo "::set-output name=wheel_file::$(ls dist/*.whl)"
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.wheel_info.outputs.wheel_file }}
-          asset_name: audiostretchy-${{ github.ref }}.whl
-          asset_content_type: application/octet-stream
-      - name: Publish to PyPi
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
+    build-and-publish:
+        needs: compile
+        runs-on: ubuntu-latest
+        if: startsWith(github.ref, 'refs/tags/')
+        steps:
+            - uses: actions/checkout@v2
+            - name: Set up Python
+              uses: actions/setup-python@v3
+              with:
+                  python-version: '3.10'
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install build
+            - name: Build wheel
+              run: python -m build
+            - name: Identify Wheel File
+              id: wheel_info
+              run: echo "::set-output name=wheel_file::$(ls dist/*.whl)"
+            - name: Create GitHub Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ github.ref }}
+                  release_name: Release ${{ github.ref }}
+                  draft: false
+                  prerelease: false
+            - name: Upload Release Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ${{ steps.wheel_info.outputs.wheel_file }}
+                  asset_name: audiostretchy-${{ github.ref }}.whl
+                  asset_content_type: application/octet-stream
+            - name: Publish to PyPi
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  user: __token__
+                  password: ${{ secrets.PYPI_TOKEN }}
