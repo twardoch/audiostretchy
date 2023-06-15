@@ -57,13 +57,14 @@ jobs:
             - name: Compile and Move (Windows)
               if: steps.check_submodule.outputs.submodule == 'true' && steps.check_file.outputs.file_exists == 'true' && matrix.os == 'windows-latest'
               uses: ilammy/msvc-dev-cmd@v1
-              arch: x64
-              spectre: false
-              shell: pwsh
-              run: |
-                  cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
-                  New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
-                  Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
+              with: 
+                arch: x64
+                spectre: false
+                shell: pwsh
+                run: |
+                    cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
+                    New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
+                    Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
             - name: Commit and push if changed
               if: steps.check_submodule.outputs.submodule == 'true'
               uses: EndBug/add-and-commit@v9
