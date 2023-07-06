@@ -11,7 +11,7 @@ from .interface.tdhs import TDHSAudioStretch
 
 class AudioStretch:
     """
-    Class to perform audio stretching operations.
+    Main class to perform audio stretching operations.
     """
 
     def __init__(self, ext: bool = False):
