@@ -1,9 +1,11 @@
-from wave import Wave_read, Wave_write
 import wave
-import numpy as np
 from io import BytesIO
 from pathlib import Path
-from typing import Union, Tuple, BinaryIO, Optional
+from typing import BinaryIO, Optional, Tuple, Union
+from wave import Wave_read, Wave_write
+
+import numpy as np
+
 from .interface.tdhs import TDHSAudioStretch
 
 
@@ -69,12 +71,13 @@ class AudioStretch:
             import mp3
 
             decoder = mp3.Decoder(audio_file)
-            with open(BytesIO(), "wb") as wav_io:
-                wav_file = Wave_write(wav_io)
-                wav_file.setnchannels(decoder.get_channels())
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(decoder.get_sample_rate())
-                wav_file.writeframes(decoder.read())
+            wav_io = BytesIO()
+            wav_file = Wave_write(wav_io)
+            wav_file.setnchannels(decoder.get_channels())
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(decoder.get_sample_rate())
+            wav_file.writeframes(decoder.read())
+            wav_io.seek(0)
             self.open_wav(wav_io)
         except ImportError:
             from pydub import AudioSegment
@@ -331,23 +334,23 @@ def stretch_audio(
     fast_detection: bool = False,
     normal_detection: bool = False,
     sample_rate: int = 0,
-    ):
+):
     """Stretches the input audio file and saves the result to the output path.
 
-Args:
-    input_path (str): The path to the input WAV or MP3 audio file.
-    output_path (str): The path to save the stretched WAV or MP3 audio file.
-    ratio (float, optional): The stretch ratio, where values greater than 1.0 will extend the audio and values less than 1.0 will shorten the audio. From 0.5 to 2.0, or with `-d` from 0.25 to 4.0. Default is 1.0 = no stretching.
-    gap_ratio (float, optional): The stretch ratio for gaps (silence) in the audio. Default is 0.0 = uses ratio.
-    upper_freq (int, optional): The upper frequency limit for period detection in Hz. Default is 333 Hz.
-    lower_freq (int, optional): The lower frequency limit. Default is 55 Hz.
-    buffer_ms (float, optional): The buffer size in milliseconds for processing the audio in chunks (useful with `-g`). Default is 25 ms.
-    threshold_gap_db (float, optional): The threshold level in dB to determine if a section of audio is considered a gap (for `-g`). Default is -40 dB.
-    double_range (bool, optional): If set, doubles the min/max range of stretching from 0.5-2.0 to 0.25-4.0. 
-    fast_detection (bool, optional): If set, enables fast period detection, which may speed up processing but reduce the quality of the stretched audio. 
-    normal_detection (bool, optional): If set, forces the algorithm to use normal period detection instead of fast period detection.
-    sample_rate (int, optional): The target sample rate for resampling the stretched audio in Hz (if installed with `[all]`). Default is 0 = use sample rate of the input audio.
-"""
+    Args:
+        input_path (str): The path to the input WAV or MP3 audio file.
+        output_path (str): The path to save the stretched WAV or MP3 audio file.
+        ratio (float, optional): The stretch ratio, where values greater than 1.0 will extend the audio and values less than 1.0 will shorten the audio. From 0.5 to 2.0, or with `-d` from 0.25 to 4.0. Default is 1.0 = no stretching.
+        gap_ratio (float, optional): The stretch ratio for gaps (silence) in the audio. Default is 0.0 = uses ratio.
+        upper_freq (int, optional): The upper frequency limit for period detection in Hz. Default is 333 Hz.
+        lower_freq (int, optional): The lower frequency limit. Default is 55 Hz.
+        buffer_ms (float, optional): The buffer size in milliseconds for processing the audio in chunks (useful with `-g`). Default is 25 ms.
+        threshold_gap_db (float, optional): The threshold level in dB to determine if a section of audio is considered a gap (for `-g`). Default is -40 dB.
+        double_range (bool, optional): If set, doubles the min/max range of stretching from 0.5-2.0 to 0.25-4.0.
+        fast_detection (bool, optional): If set, enables fast period detection, which may speed up processing but reduce the quality of the stretched audio.
+        normal_detection (bool, optional): If set, forces the algorithm to use normal period detection instead of fast period detection.
+        sample_rate (int, optional): The target sample rate for resampling the stretched audio in Hz (if installed with `[all]`). Default is 0 = use sample rate of the input audio.
+    """
     audio_stretch = AudioStretch()
     audio_stretch.open(input_path)
     audio_stretch.stretch(
