@@ -2,7 +2,7 @@
 
 AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library. 
 
-_Version: **1.3.2** 
+Version: **1.3.3**
 
 ## Features
 
@@ -35,7 +35,7 @@ Below are links to a short audio file (as WAV and MP3), with the same file stret
 To be able to **stretch** and **resample** both **WAV** and **MP3** files, install AudioStretchy using `pip` like so:
 
 ```
-pip install audiostretchy[all]
+python3 -m pip install audiostretchy[all]
 ```
 
 This installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux. 
@@ -56,7 +56,7 @@ brew install ffmpeg
 To only be able to **stretch** **WAV** files (no resampling, no MP3 support), install AudioStretchy with minimal dependencies like so: 
 
 ```
-pip install audiostretchy
+python3 -m pip install audiostretchy
 ```
 
 This only installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux. 
