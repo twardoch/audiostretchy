@@ -152,7 +152,7 @@ class AudioStretch:
             encoder.set_channels(self.nchannels)
             encoder.set_quality(quality)
             encoder.set_mode(
-                mp3.MODE_STEREO if nchannels == 2 else mp3.MODE_SINGLE_CHANNEL
+                mp3.MODE_STEREO if self.nchannels == 2 else mp3.MODE_SINGLE_CHANNEL
             )
             encoder.write(self.pcm)
         except ImportError:
