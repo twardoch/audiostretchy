@@ -100,7 +100,7 @@ class AudioStretch:
                         mode="w",
                         samplerate=self.framerate,
                         num_channels=self.nchannels,
-                        format=output_format if output_format else Path(output_target).suffix[1:]
+                        format=output_format or Path(output_target).suffix[1:]
                     ) as f:
                         f.write(processed_samples)
             elif file: # If it was a file object to begin with
