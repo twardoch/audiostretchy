@@ -118,7 +118,7 @@ class AudioStretch:
 
         except Exception as e:
             # Ensure output_target for the error message is the original path/file identifier
-            error_location = path if path else (file.name if hasattr(file, 'name') else 'provided file object')
+            error_location = path or (file.name if hasattr(file, 'name') else 'provided file object')
             raise IOError(f"Could not save audio file to {error_location}: {e}") from e
 
     # pcm_decode and pcm_encode are no longer needed as pedalboard handles this.
