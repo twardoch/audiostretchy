@@ -74,7 +74,7 @@ class AudioStretch:
             output_format (str, optional): The format of the audio file (e.g., 'wav', 'mp3').
                                        Pedalboard often infers from path extension.
         """
-        output_target = file if file else path
+        output_target = file or path
         if not output_target:
             raise ValueError("Either path or file must be provided for saving.")
 
