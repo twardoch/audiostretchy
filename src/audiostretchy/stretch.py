@@ -55,7 +55,7 @@ class AudioStretch:
                 self.nchannels = f.num_channels
             self.samples = self.in_samples.copy() # Start with a copy for processing
         except Exception as e:
-            raise IOError(f"Could not open audio file {input_source}: {e}")
+            raise IOError(f"Could not open audio file {input_source}: {e}") from e
 
 
     def save(
