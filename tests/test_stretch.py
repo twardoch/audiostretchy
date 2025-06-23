@@ -99,6 +99,17 @@ def test_resample(audio_processor, sample_wav_path):
     # Resampling can have slight variations in frame count
     assert abs(current_frames - expected_frames) < 5 # Allow small deviation
 
+def test_resample_noop(audio_processor, sample_wav_path):
+    """Test that resampling to the same sample rate is a no-op."""
+    audio_processor.open(sample_wav_path)
+    original_framerate = audio_processor.framerate
+    original_samples = audio_processor.samples.copy()
+    audio_processor.resample(original_framerate)
+    assert audio_processor.framerate == original_framerate
+    # The samples should be unchanged
+    assert audio_processor.samples.shape == original_samples.shape
+    assert (audio_processor.samples == original_samples).all()
+
 def test_stretch_no_change(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
     original_samples_shape = audio_processor.samples.shape
