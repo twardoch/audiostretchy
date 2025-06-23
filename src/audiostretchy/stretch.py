@@ -41,7 +41,7 @@ class AudioStretch:
             path (Union[str, Path], optional): Path to the audio file.
             file (BinaryIO, optional): Binary I/O object of the audio file.
         """
-        input_source = file if file else path
+        input_source = file or path
         if not input_source:
             raise ValueError("Either path or file must be provided.")
 
