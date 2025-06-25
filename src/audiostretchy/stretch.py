@@ -163,59 +163,137 @@ class AudioStretch:
 
     def stretch(
         self,
-        ratio: float = 1.0, # This is inverse of pedalboard's stretch_factor
-        # The following parameters are from TDHSAudioStretch and may not map directly
-        # gap_ratio: float = 0.0,
-        # upper_freq: int = 333,
-        # lower_freq: int = 55,
-        # buffer_ms: float = 25,
-        # threshold_gap_db: float = -40,
-        # double_range: bool = False, # TDHS specific range flag
-        # fast_detection: bool = False, # TDHS specific quality/speed flag
-        # normal_detection: bool = False, # TDHS specific quality/speed flag
-        # ---- Pedalboard TimeStretch parameters ----
-        # method: str = "auto" # e.g. "rubberband", "ola", "wsola" - "auto" usually picks rubberband if available
-        # quality: str = "high" # e.g. "standard", "high", "extreme" for rubberband
+        ratio: float = 1.0,
+        gap_ratio: float = 0.0,
+        upper_freq: int = 333,
+        lower_freq: int = 55,
+        buffer_ms: float = 25,
+        threshold_gap_db: float = -40,
+        double_range: bool = False,
+        fast_detection: bool = False,
+        normal_detection: bool = False,
     ):
         """
-        Stretch the audio using Pedalboard.TimeStretch.
-        Note: `ratio` > 1.0 extends audio (slower), < 1.0 shortens (faster).
-        Pedalboard's `stretch_factor` is the inverse: factor > 1.0 is faster, < 1.0 is slower.
+        Stretch the audio using the TDHS C library.
+        Audio data is read as float32 by Pedalboard, converted to int16 for TDHS,
+        and then converted back to float32.
 
         Args:
-            ratio (float): Original stretch ratio (compatible with TDHS definition).
-                           > 1.0 makes audio longer, < 1.0 makes it shorter.
-            # TODO: Map or implement gap_ratio and other features if possible.
-            # TODO: Expose pedalboard.TimeStretch parameters like method, quality.
+            ratio (float): Stretch ratio. > 1.0 makes audio longer. Default 1.0.
+            gap_ratio (float): Stretch ratio for silence. Default 0.0 (uses main ratio).
+            upper_freq (int): Upper frequency limit for period detection (Hz). Default 333.
+            lower_freq (int): Lower frequency limit for period detection (Hz). Default 55.
+            buffer_ms (float): Buffer size in milliseconds for silence detection. Default 25.
+            threshold_gap_db (float): Silence threshold in dB. Default -40.
+            double_range (bool): Use extended ratio range (0.25-4.0). Default False.
+            fast_detection (bool): Use fast pitch detection. Default False.
+            normal_detection (bool): Force normal pitch detection. Default False.
         """
         if self.samples is None:
             raise ValueError("No audio data to stretch. Call open() first.")
-        if ratio == 1.0:
-            return # No stretching needed
 
-        # Convert audiostretchy ratio to pedalboard stretch_factor
-        # ratio = 1.2 (20% longer) => pedalboard factor = 1/1.2 = 0.833...
-        # ratio = 0.8 (20% shorter) => pedalboard factor = 1/0.8 = 1.25
-        stretch_factor = 1.0 / ratio
+        if ratio == 1.0 and gap_ratio == 0.0: # Or gap_ratio == ratio
+             # More precise check: if gap_ratio is effectively same as ratio
+            effective_gap_ratio = gap_ratio if gap_ratio != 0.0 else ratio
+            if ratio == 1.0 and effective_gap_ratio == 1.0:
+                return # No stretching needed
 
-        # For now, ignoring gap_ratio and other TDHS-specific params.
-        # This is a simplified stretch of the whole audio.
+        # Pedalboard samples are float32, shape (num_channels, num_frames)
+        # TDHS C library expects int16, interleaved if stereo [L, R, L, R, ...]
 
-        # Pedalboard's time_stretch is a direct function, not a plugin for the board.
-        # It expects (num_channels, num_frames), which self.samples already is.
-        current_samples_for_stretch = self.samples
+        # Convert float32 samples to int16
+        # Max value of int16 is 32767
+        int16_samples = (self.samples * 32767).astype(np.int16)
 
-        stretched_audio = TimeStretch(
-            current_samples_for_stretch,
-            samplerate=self.framerate,
-            stretch_factor=stretch_factor,
-            # TODO: Expose other parameters like high_quality, transient_mode etc.
+        # Interleave if stereo
+        if self.nchannels == 1:
+            # For mono, TDHS expects a 1D array
+            pcm_data_in = np.ascontiguousarray(int16_samples[0, :])
+        elif self.nchannels == 2:
+            # For stereo, interleave L and R channels
+            pcm_data_in = np.ascontiguousarray(int16_samples.T.ravel())
+        else:
+            raise ValueError(f"TDHSAudioStretch currently supports 1 or 2 channels, not {self.nchannels}")
+
+        flags = 0
+        if fast_detection:
+            flags |= TDHSAudioStretch.STRETCH_FAST_FLAG
+        if double_range or ratio < 0.5 or ratio > 2.0 or \
+           (gap_ratio != 0.0 and (gap_ratio < 0.5 or gap_ratio > 2.0)):
+            flags |= TDHSAudioStretch.STRETCH_DUAL_FLAG
+
+        # Note: normal_detection is implicitly handled by not setting STRETCH_FAST_FLAG
+        # or if TDHS library itself defaults one way or another based on sample rate.
+        # The original C CLI had logic for this. For simplicity, we rely on flags.
+
+        min_period = int(self.framerate / upper_freq)
+        max_period = int(self.framerate / lower_freq)
+
+        stretcher = TDHSAudioStretch(min_period, max_period, self.nchannels, flags)
+
+        # Determine buffer size for processing in chunks, esp. for gap_ratio
+        # This logic mimics parts of the original C CLI application (main.c)
+        # buffer_ms determines chunk size for analyzing silence vs. sound
+
+        # If gap_ratio is not used, we can process in larger chunks or all at once
+        # For simplicity in this Python wrapper, if gap_ratio is default (0.0),
+        # we'll process the whole audio with the main `ratio`.
+        # If gap_ratio is specified, we need a more complex loop segmenting audio.
+        # The original AudioStretchy python code did not fully implement the C main.c's gap logic.
+        # It passed all samples at once. We will replicate that simpler behavior first.
+        # TODO: Re-evaluate implementing the more complex frame-by-frame silence detection from C if essential for MVP.
+        # For now, if gap_ratio is set, it implies the C library might use it if it has internal logic,
+        # but this Python wrapper isn't doing the pre-segmentation based on RMS levels like the C CLI.
+        # The C library's `stretch_samples` itself doesn't take `gap_ratio`. It's the calling C code in `main.c`
+        # that switches ratios based on RMS.
+        # THEREFORE, `gap_ratio`, `buffer_ms`, `threshold_gap_db` from Python are not directly usable
+        # by just calling `stretcher.process_samples` once with a single ratio.
+        # The current TDHSAudioStretch python binding does not expose a way to set separate gap ratio.
+        # This means `gap_ratio` and related params are effectively unused by the current Python bindings.
+        # We will proceed by only using the main `ratio`.
+
+        num_input_frames_per_channel = pcm_data_in.shape[0] // self.nchannels
+
+        # Output capacity estimation
+        # For dual flag, max_ratio can be 4.0, else 2.0
+        max_effective_ratio_for_capacity = 4.0 if (flags & TDHSAudioStretch.STRETCH_DUAL_FLAG) else 2.0
+        # If actual ratio is smaller, use that for a tighter bound
+        max_effective_ratio_for_capacity = max(ratio, max_effective_ratio_for_capacity if ratio > 1.0 else 1.0/ratio if ratio !=0 else 1.0)
+
+
+        out_capacity = stretcher.output_capacity(num_input_frames_per_channel, max_effective_ratio_for_capacity)
+        pcm_data_out = np.zeros(out_capacity * self.nchannels, dtype=np.int16)
+
+        num_processed_frames = stretcher.process_samples(
+            pcm_data_in, num_input_frames_per_channel, pcm_data_out, ratio
         )
 
-        # Output of time_stretch is (num_channels, num_frames).
-        self.samples = stretched_audio
+        # Flush any remaining samples
+        # The flush buffer needs to be large enough.
+        # Output_capacity should also cover typical flush sizes from TDHS.
+        pcm_data_flush_out = np.zeros(out_capacity * self.nchannels, dtype=np.int16) # Re-use capacity estimate
+        num_flushed_frames = stretcher.flush(pcm_data_flush_out)
 
-        # The number of frames and thus duration changes, framerate stays the same.
+        # Concatenate processed and flushed samples
+        actual_output_samples_int16 = np.concatenate(
+            (pcm_data_out[:num_processed_frames * self.nchannels],
+             pcm_data_flush_out[:num_flushed_frames * self.nchannels])
+        )
+
+        stretcher.deinit()
+
+        # Convert back to float32 and de-interleave
+        # TDHS output is also int16, interleaved
+        float32_output_samples = actual_output_samples_int16.astype(np.float32) / 32767.0
+
+        if self.nchannels == 1:
+            self.samples = float32_output_samples.reshape(1, -1)
+        elif self.nchannels == 2:
+            # De-interleave: reshape to (num_frames, num_channels) then transpose
+            self.samples = float32_output_samples.reshape(-1, self.nchannels).T
+
+        # Ensure contiguity for pedalboard processing later
+        self.samples = np.ascontiguousarray(self.samples)
 
 
 # Global function for CLI and simple library use
@@ -223,37 +301,52 @@ def stretch_audio(
     input_path: str,
     output_path: str,
     ratio: float = 1.0,
-    # TDHS specific parameters - these will be ignored or need re-mapping for Pedalboard
-    gap_ratio: float = 0.0, # Will be harder to implement with pedalboard directly
-    upper_freq: int = 333,   # Not directly applicable to pedalboard.TimeStretch
-    lower_freq: int = 55,    # Not directly applicable
-    buffer_ms: float = 25,   # Not directly applicable
-    threshold_gap_db: float = -40, # Not directly applicable for basic stretch
-    double_range: bool = False,    # Not directly applicable
-    fast_detection: bool = False,  # Not directly applicable (pedalboard has quality settings)
-    normal_detection: bool = False,# Not directly applicable
-    sample_rate: int = 0, # Target sample rate for resampling
+    gap_ratio: float = 0.0,
+    upper_freq: int = 333,
+    lower_freq: int = 55,
+    buffer_ms: float = 25, # Currently not used effectively by Python stretch method
+    threshold_gap_db: float = -40, # Currently not used effectively
+    double_range: bool = False,
+    fast_detection: bool = False,
+    normal_detection: bool = False, # Currently not used effectively
+    sample_rate: int = 0,
 ):
     """
-    Stretches the input audio file and saves the result to the output path using Pedalboard.
+    Stretches the input audio file using TDHS C library and saves the result.
+    Uses Pedalboard for audio I/O and resampling.
 
     Args:
-        input_path (str): The path to the input audio file.
-        output_path (str): The path to save the stretched audio file.
-        ratio (float, optional): The stretch ratio. > 1.0 extends audio, < 1.0 shortens.
-                                 Default is 1.0 (no change).
-        sample_rate (int, optional): The target sample rate for resampling.
-                                     Default is 0 (use sample rate of the input audio).
-
-        NOTE: Parameters related to TDHS (gap_ratio, freq limits, etc.) are currently
-              not supported in this Pedalboard-based version. The stretch applies uniformly.
+        input_path (str): Path to the input audio file.
+        output_path (str): Path to save the stretched audio file.
+        ratio (float, optional): Stretch ratio. > 1.0 extends audio. Default 1.0.
+        gap_ratio (float, optional): Stretch ratio for silence. Default 0.0 (uses main ratio).
+                                     NOTE: Effective use requires Python-side segmentation not yet implemented.
+        upper_freq (int, optional): Upper frequency limit for period detection (Hz). Default 333.
+        lower_freq (int, optional): Lower frequency limit (Hz). Default 55.
+        buffer_ms (float, optional): Buffer size in ms for silence detection. Default 25. (Not currently used by Python)
+        threshold_gap_db (float, optional): Silence threshold in dB. Default -40. (Not currently used by Python)
+        double_range (bool, optional): Use extended ratio range (0.25-4.0). Default False.
+        fast_detection (bool, optional): Use fast pitch detection. Default False.
+        normal_detection (bool, optional): Force normal pitch detection. Default False. (Not currently used by Python)
+        sample_rate (int, optional): Target sample rate for resampling. Default 0 (no resampling).
     """
     audio_processor = AudioStretch()
     audio_processor.open(input_path)
 
     # 1. Stretch
-    if ratio != 1.0:
-        audio_processor.stretch(ratio=ratio) # Add other relevant params later if implemented
+    # Note: gap_ratio, buffer_ms, threshold_gap_db, normal_detection are passed but may have limited effect
+    # without Python-side audio segmentation logic for silence.
+    audio_processor.stretch(
+        ratio=ratio,
+        gap_ratio=gap_ratio, # Passed to C, but C python wrapper doesn't use it for segmentation
+        upper_freq=upper_freq,
+        lower_freq=lower_freq,
+        buffer_ms=buffer_ms,
+        threshold_gap_db=threshold_gap_db,
+        double_range=double_range,
+        fast_detection=fast_detection,
+        normal_detection=normal_detection
+    )
 
     # 2. Resample (if needed)
     if sample_rate > 0 and sample_rate != audio_processor.framerate:

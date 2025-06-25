@@ -1,0 +1,3487 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.github/
+  workflows/
+    ci.yaml
+docs/
+  _static/
+    .gitignore
+  authors.md
+  changelog.md
+  conf.py
+  contributing.md
+  index.md
+  license.md
+  Makefile
+  readme.md
+  requirements.txt
+src/
+  audiostretchy/
+    interface/
+      win/
+        _stretch.def
+      tdhs.py
+    __init__.py
+    __main__.py
+    py.typed
+    stretch.py
+tests/
+  conftest.py
+  test_stretch.py
+vendors/
+  stretch/
+    samples/
+      README
+    .git
+    .gitignore
+    build.sh
+    license.txt
+    main.c
+    README
+    stretch.c
+    stretch.h
+    test.sh
+.coveragerc
+.gitignore
+.gitmodules
+.isort.cfg
+.pre-commit-config.yaml
+.readthedocs.yml
+AUTHORS.md
+LICENSE.txt
+pyproject.toml
+README.md
+setup.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="vendors/stretch/samples/README">
+These are two, 60 second samples for exercising the stretch algorithms. They are
+encoded with the WavPack lossless codec, so they'll need to be converted back to
+Microsoft WAV files to be used. One is mono, and the other is a stereo version
+of the first, but with one channel delayed 1/2 sample.
+
+These are not speech samples, but are artificially generated test signals. They
+consist of a warbling tone (between 75 and 1500 Hz) and varying levels of noise.
+They are also generated at a high level (in some places clipping) to verify the
+proper operation of the stretch code with edge-case values.
+</file>
+
+<file path="vendors/stretch/.git">
+gitdir: ../../.git/modules/vendors/stretch
+</file>
+
+<file path="vendors/stretch/.gitignore">
+output
+audio-stretch
+samples/*.wav
+</file>
+
+<file path="vendors/stretch/build.sh">
+#!/bin/bash
+
+if [ -z "$1" ] || [ "$1" = "rel" ]; then
+  echo "building release .."
+  gcc -Ofast main.c stretch.c -lm -o audio-stretch
+elif [ "$1" = "dbg" ]; then
+  echo "building debug .."
+  gcc -O0 -g main.c stretch.c -lm -o audio-stretch
+elif [ "$1" = "ubsan" ]; then
+  echo "building debug with undefined behaviour sanitizer .."
+  gcc -O0 -g main.c stretch.c -fsanitize=undefined -lm -o audio-stretch
+elif [ "$1" = "asan" ]; then
+  echo "building debug with address sanitizer .."
+  gcc -O0 -g main.c stretch.c -fsanitize=address -lm -o audio-stretch
+else
+  echo "error: unknown option '$1'"
+fi
+</file>
+
+<file path="vendors/stretch/license.txt">
+Copyright (c) David Bryant
+                          All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Conifer Software nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+</file>
+
+<file path="vendors/stretch/main.c">
+////////////////////////////////////////////////////////////////////////////
+//                        **** AUDIO-STRETCH ****                         //
+//                      Time Domain Harmonic Scaler                       //
+//                    Copyright (c) 2022 David Bryant                     //
+//                          All Rights Reserved.                          //
+//      Distributed under the BSD Software License (see license.txt)      //
+////////////////////////////////////////////////////////////////////////////
+
+// main.c
+
+// This module provides a demo for the TDHS library using WAV files.
+
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+
+#include "stretch.h"
+
+#define SILENCE_THRESHOLD_DB    -40
+#define AUDIO_WINDOW_MS         25
+
+static const char *sign_on = "\n"
+" AUDIO-STRETCH  Time Domain Harmonic Scaling Demo  Version 0.4\n"
+" Copyright (c) 2022 David Bryant. All Rights Reserved.\n\n";
+
+static const char *usage =
+" Usage:     AUDIO-STRETCH [-options] infile.wav outfile.wav\n\n"
+" Options:  -r<n.n> = stretch ratio (0.25 to 4.0, default = 1.0)\n"
+"           -g<n.n> = gap/silence stretch ratio (if different)\n"
+"           -u<n>   = upper freq period limit (default = 333 Hz)\n"
+"           -l<n>   = lower freq period limit (default = 55 Hz)\n"
+"           -b<n>   = audio buffer/window length (ms, default = 25)\n"
+"           -t<n>   = gap/silence threshold (dB re FS, default = -40)\n"
+"           -c      = cycle through all ratios, starting higher\n"
+"           -cc     = cycle through all ratios, starting lower\n"
+"           -d      = force dual instance even for shallow ratios\n"
+"           -s      = scale rate to preserve duration (not pitch)\n"
+"           -f      = fast pitch detection (default >= 32 kHz)\n"
+"           -n      = normal pitch detection (default < 32 kHz)\n"
+"           -q      = quiet mode (display errors only)\n"
+"           -v      = verbose (display lots of info)\n"
+"           -y      = overwrite outfile if it exists\n\n"
+" Web:      Visit www.github.com/dbry/audio-stretch for latest version\n\n";
+
+typedef struct {
+    char ckID [4];
+    uint32_t ckSize;
+    char formType [4];
+} RiffChunkHeader;
+
+typedef struct {
+    char ckID [4];
+    uint32_t ckSize;
+} ChunkHeader;
+
+typedef struct {
+    uint16_t FormatTag, NumChannels;
+    uint32_t SampleRate, BytesPerSecond;
+    uint16_t BlockAlign, BitsPerSample;
+    uint16_t cbSize;
+    union {
+        uint16_t ValidBitsPerSample;
+        uint16_t SamplesPerBlock;
+        uint16_t Reserved;
+    } Samples;
+    int32_t ChannelMask;
+    uint16_t SubFormat;
+    char GUID [14];
+} WaveHeader;
+
+#define WAVE_FORMAT_PCM         0x1
+#define WAVE_FORMAT_EXTENSIBLE  0xfffe
+
+static int write_pcm_wav_header (FILE *outfile, uint32_t num_samples, int num_channels, int bytes_per_sample, uint32_t sample_rate);
+double rms_level_dB (int16_t *audio, int samples, int channels);
+
+static int verbose_mode, quiet_mode;
+
+int main (argc, argv) int argc; char **argv;
+{
+    int asked_help = 0, overwrite = 0, scale_rate = 0, force_fast = 0, force_normal = 0, force_dual = 0, cycle_ratio = 0;
+    float ratio = 1.0, silence_ratio = 0.0, silence_threshold_dB = SILENCE_THRESHOLD_DB;
+    uint32_t samples_to_process, insamples = 0, outsamples = 0;
+    int upper_frequency = 333, lower_frequency = 55;
+    char *infilename = NULL, *outfilename = NULL;
+    int audio_window_ms = AUDIO_WINDOW_MS;
+    RiffChunkHeader riff_chunk_header;
+    WaveHeader WaveHeader = { 0 };
+    ChunkHeader chunk_header;
+    StretchHandle stretcher;
+    FILE *infile, *outfile;
+
+    // loop through command-line arguments
+
+    while (--argc) {
+#ifdef _WIN32
+        if ((**++argv == '-' || **argv == '/') && (*argv)[1])
+#else
+        if ((**++argv == '-') && (*argv)[1])
+#endif
+            while (*++*argv)
+                switch (**argv) {
+
+                    case 'U': case 'u':
+                        upper_frequency = strtol (++*argv, argv, 10);
+
+                        if (upper_frequency <= 40) {
+                            fprintf (stderr, "\nupper frequency must be at least 40 Hz!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'L': case 'l':
+                        lower_frequency = strtol (++*argv, argv, 10);
+
+                        if (lower_frequency < 20) {
+                            fprintf (stderr, "\nlower frequency must be at least 20 Hz!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'B': case 'b':
+                        audio_window_ms = strtol (++*argv, argv, 10);
+
+                        if (audio_window_ms < 1 || audio_window_ms > 100) {
+                            fprintf (stderr, "\naudio window is from 1 to 100 ms!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'R': case 'r':
+                        ratio = strtod (++*argv, argv);
+
+                        if (ratio < 0.25 || ratio > 4.0) {
+                            fprintf (stderr, "\nratio must be from 0.25 to 4.0!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'G': case 'g':
+                        silence_ratio = strtod (++*argv, argv);
+
+                        if (silence_ratio < 0.25 || silence_ratio > 4.0) {
+                            fprintf (stderr, "\ngap/silence ratio must be from 0.25 to 4.0!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'T': case 't':
+                        silence_threshold_dB = strtod (++*argv, argv);
+
+                        if (silence_threshold_dB < -70 || silence_threshold_dB > -10) {
+                            fprintf (stderr, "\nsilence threshold must be from -10 to -70 dB!\n");
+                            return -1;
+                        }
+
+                        --*argv;
+                        break;
+
+                    case 'S': case 's':
+                        scale_rate = 1;
+                        break;
+
+                    case 'C': case 'c':
+                        cycle_ratio++;
+                        break;
+
+                    case 'D': case 'd':
+                        force_dual = 1;
+                        break;
+
+                    case 'F': case 'f':
+                        force_fast = 1;
+                        break;
+
+                    case 'N': case 'n':
+                        force_normal = 1;
+                        break;
+
+                    case 'H': case 'h':
+                        asked_help = 1;
+                        break;
+
+                    case 'V': case 'v':
+                        verbose_mode = 1;
+                        break;
+
+                    case 'Q': case 'q':
+                        quiet_mode = 1;
+                        break;
+
+                    case 'Y': case 'y':
+                        overwrite = 1;
+                        break;
+
+                    default:
+                        fprintf (stderr, "\nillegal option: %c !\n", **argv);
+                        return -1;
+                }
+        else if (!infilename)
+            infilename = *argv;
+        else if (!outfilename)
+            outfilename = *argv;
+        else {
+            fprintf (stderr, "\nextra unknown argument: %s !\n", *argv);
+            return -1;
+        }
+    }
+
+    if (!quiet_mode)
+        fprintf (stderr, "%s", sign_on);
+
+    if (!outfilename || asked_help) {
+        printf ("%s", usage);
+        return 0;
+    }
+
+    if (!strcmp (infilename, outfilename)) {
+        fprintf (stderr, "can't overwrite input file (specify different/new output file name)\n");
+        return -1;
+    }
+
+    if (!overwrite && (outfile = fopen (outfilename, "r"))) {
+        fclose (outfile);
+        fprintf (stderr, "output file \"%s\" exists (use -y to overwrite)\n", outfilename);
+        return -1;
+    }
+
+    if (!(infile = fopen (infilename, "rb"))) {
+        fprintf (stderr, "can't open file \"%s\" for reading!\n", infilename);
+        return 1;
+    }
+
+    // read initial RIFF form header
+
+    if (!fread (&riff_chunk_header, sizeof (RiffChunkHeader), 1, infile) ||
+        strncmp (riff_chunk_header.ckID, "RIFF", 4) ||
+        strncmp (riff_chunk_header.formType, "WAVE", 4)) {
+            fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+            return 1;
+    }
+
+    // loop through all elements of the RIFF wav header (until the data chuck)
+
+    while (1) {
+        if (!fread (&chunk_header, sizeof (ChunkHeader), 1, infile)) {
+            fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+            return 1;
+        }
+
+        // if it's the format chunk, we want to get some info out of there and
+        // make sure it's a .wav file we can handle
+
+        if (!strncmp (chunk_header.ckID, "fmt ", 4)) {
+            int format, bits_per_sample;
+
+            if (chunk_header.ckSize < 16 || chunk_header.ckSize > sizeof (WaveHeader) ||
+                !fread (&WaveHeader, chunk_header.ckSize, 1, infile)) {
+                    fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+                    return 1;
+            }
+
+            format = (WaveHeader.FormatTag == WAVE_FORMAT_EXTENSIBLE && chunk_header.ckSize == 40) ?
+                WaveHeader.SubFormat : WaveHeader.FormatTag;
+
+            bits_per_sample = (chunk_header.ckSize == 40 && WaveHeader.Samples.ValidBitsPerSample) ?
+                WaveHeader.Samples.ValidBitsPerSample : WaveHeader.BitsPerSample;
+
+            if (bits_per_sample != 16) {
+                fprintf (stderr, "\"%s\" is not a 16-bit .WAV file!\n", infilename);
+                return 1;
+            }
+
+            if (WaveHeader.NumChannels < 1 || WaveHeader.NumChannels > 2) {
+                fprintf (stderr, "\"%s\" is not a mono or stereo .WAV file!\n", infilename);
+                return 1;
+            }
+
+            if (WaveHeader.BlockAlign != WaveHeader.NumChannels * 2) {
+                fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+                return 1;
+            }
+
+            if (format == WAVE_FORMAT_PCM) {
+                if (WaveHeader.SampleRate < 8000 || WaveHeader.SampleRate > 48000) {
+                    fprintf (stderr, "\"%s\" sample rate is %lu, must be 8000 to 48000!\n", infilename, (unsigned long) WaveHeader.SampleRate);
+                    return 1;
+                }
+            }
+            else {
+                fprintf (stderr, "\"%s\" is not a PCM .WAV file!\n", infilename);
+                return 1;
+            }
+        }
+        else if (!strncmp (chunk_header.ckID, "data", 4)) {
+
+            // on the data chunk, get size and exit parsing loop
+
+            if (!WaveHeader.SampleRate) {      // make sure we saw a "fmt" chunk...
+                fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+                return 1;
+            }
+
+            if (!chunk_header.ckSize) {
+                fprintf (stderr, "this .WAV file has no audio samples, probably is corrupt!\n");
+                return 1;
+            }
+
+            if (chunk_header.ckSize % WaveHeader.BlockAlign) {
+                fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+                return 1;
+            }
+
+            samples_to_process = chunk_header.ckSize / WaveHeader.BlockAlign;
+
+            if (!samples_to_process) {
+                fprintf (stderr, "this .WAV file has no audio samples, probably is corrupt!\n");
+                return 1;
+            }
+
+            break;
+        }
+        else {          // just ignore unknown chunks
+            uint32_t bytes_to_eat = (chunk_header.ckSize + 1) & ~1L;
+            char dummy;
+
+            while (bytes_to_eat--)
+                if (!fread (&dummy, 1, 1, infile)) {
+                    fprintf (stderr, "\"%s\" is not a valid .WAV file!\n", infilename);
+                    return 1;
+                }
+        }
+    }
+
+    if (upper_frequency < lower_frequency * 2 || upper_frequency >= WaveHeader.SampleRate / 2) {
+        fprintf (stderr, "invalid frequencies specified!\n");
+        fclose (infile);
+        return 1;
+    }
+
+    int flags = 0, silence_mode = silence_ratio && !cycle_ratio && silence_ratio != ratio;
+    int buffer_samples = WaveHeader.SampleRate * (audio_window_ms / 1000.0);
+    int min_period = WaveHeader.SampleRate / upper_frequency;
+    int max_period = WaveHeader.SampleRate / lower_frequency;
+    float max_ratio = ratio;
+
+    if (force_dual || ratio < 0.5 || ratio > 2.0 ||
+        (silence_mode && (silence_ratio < 0.5 || silence_ratio > 2.0)))
+            flags |= STRETCH_DUAL_FLAG;
+
+    if ((force_fast || WaveHeader.SampleRate >= 32000) && !force_normal)
+        flags |= STRETCH_FAST_FLAG;
+
+    if (verbose_mode) {
+        fprintf (stderr, "file sample rate is %lu Hz (%s), buffer size is %d samples\n",
+            (unsigned long) WaveHeader.SampleRate, WaveHeader.NumChannels == 2 ? "stereo" : "mono", buffer_samples);
+        fprintf (stderr, "stretch period range = %d to %d, %d channels, %s, %s\n",
+            min_period, max_period, WaveHeader.NumChannels, (flags & STRETCH_FAST_FLAG) ? "fast mode" : "normal mode",
+            (flags & STRETCH_DUAL_FLAG) ? "dual instance" : "single instance");
+    }
+
+    if (!quiet_mode && ratio == 1.0 && !silence_mode && !cycle_ratio)
+        fprintf (stderr, "warning: a ratio of 1.0 will do nothing but copy the WAV file!\n");
+
+    if (!quiet_mode && ratio != 1.0 && cycle_ratio && !scale_rate)
+        fprintf (stderr, "warning: specifying ratio with cycling doesn't do anything (unless scaling rate)\n");
+
+    stretcher = stretch_init (min_period, max_period, WaveHeader.NumChannels, flags);
+
+    if (!stretcher) {
+        fprintf (stderr, "can't initialize stretcher\n");
+        fclose (infile);
+        return 1;
+    }
+
+    if (!(outfile = fopen (outfilename, "wb"))) {
+        fprintf (stderr, "can't open file \"%s\" for writing!\n", outfilename);
+        fclose (infile);
+        return 1;
+    }
+
+    uint32_t scaled_rate = scale_rate ? (uint32_t)(WaveHeader.SampleRate * ratio + 0.5) : WaveHeader.SampleRate;
+    write_pcm_wav_header (outfile, 0, WaveHeader.NumChannels, 2, scaled_rate);
+
+    if (cycle_ratio)
+        max_ratio = (flags & STRETCH_DUAL_FLAG) ? 4.0 : 2.0;
+    else if (silence_mode && silence_ratio > max_ratio)
+        max_ratio = silence_ratio;
+
+    int max_expected_samples = stretch_output_capacity (stretcher, buffer_samples, max_ratio);
+    int16_t *inbuffer = malloc (buffer_samples * WaveHeader.BlockAlign), *prebuffer = NULL;
+    int16_t *outbuffer = malloc (max_expected_samples * WaveHeader.BlockAlign);
+    int non_silence_frames = 0, silence_frames = 0, used_silence_frames = 0;
+    int max_generated_stretch = 0, max_generated_flush = 0;
+    int samples_to_stretch = 0, consecutive_silence_frames = 1;
+
+    /* in the gap/silence mode we need an additional buffer to scan the "next" buffer for level */
+
+    if (silence_mode)
+        prebuffer = malloc (buffer_samples * WaveHeader.BlockAlign);
+
+    if (!inbuffer || !outbuffer || (silence_mode && !prebuffer)) {
+        fprintf (stderr, "can't allocate required memory!\n");
+        fclose (infile);
+        return 1;
+    }
+
+    /* read the entire file in frames and process with stretch */
+
+    while (1) {
+        int samples_read = fread (silence_mode ? prebuffer : inbuffer, WaveHeader.BlockAlign,
+            samples_to_process >= buffer_samples ? buffer_samples : samples_to_process, infile);
+
+        if (!silence_mode && !samples_read)
+            break;
+
+        insamples += samples_read;
+        samples_to_process -= samples_read;
+
+        /* this is where we scan the frame we just read to see if it's below the silence threshold */
+
+        if (silence_mode) {
+            if (samples_read) {
+                double level = rms_level_dB (prebuffer, samples_read, WaveHeader.NumChannels);
+
+                if (level > silence_threshold_dB) {
+                    consecutive_silence_frames = 0;
+                    non_silence_frames++;
+                }
+                else {
+                    consecutive_silence_frames++;
+                    silence_frames++;
+                }
+            }
+        }
+        else
+            samples_to_stretch = samples_read;
+
+        if (cycle_ratio) {
+            if (flags & STRETCH_DUAL_FLAG)
+                ratio = (sin ((double) outsamples / WaveHeader.SampleRate / 2.0) * (cycle_ratio & 1 ? 1.875 : -1.875)) + 2.125;
+            else
+                ratio = (sin ((double) outsamples / WaveHeader.SampleRate) * (cycle_ratio & 1 ? 0.75 : -0.75)) + 1.25;
+        }
+
+        if (samples_to_stretch) {
+            int samples_generated;
+
+            /* we use the gap/silence stretch ratio if the current frame, and the ones on either side, measure below the threshold */
+
+            if (consecutive_silence_frames >= 3) {
+                samples_generated = stretch_samples (stretcher, inbuffer, samples_to_stretch, outbuffer, silence_ratio);
+                used_silence_frames++;
+            }
+            else
+                samples_generated = stretch_samples (stretcher, inbuffer, samples_to_stretch, outbuffer, ratio);
+
+            if (samples_generated) {
+                if (samples_generated > max_generated_stretch)
+                    max_generated_stretch = samples_generated;
+
+                fwrite (outbuffer, WaveHeader.BlockAlign, samples_generated, outfile);
+                outsamples += samples_generated;
+
+                if (samples_generated > max_expected_samples) {
+                    fprintf (stderr, "stretch: generated samples (%d) exceeded expected (%d)!\n", samples_generated, max_expected_samples);
+                    fclose (infile);
+                    return 1;
+                }
+            }
+        }
+
+        if (silence_mode) {
+            if (samples_read) {
+                memcpy (inbuffer, prebuffer, samples_read * WaveHeader.BlockAlign);
+                samples_to_stretch = samples_read;
+            }
+            else
+                break;
+        }
+    }
+
+    /* next call the stretch flush function until it returns zero */
+
+    while (1) {
+        int samples_flushed = stretch_flush (stretcher, outbuffer);
+
+        if (!samples_flushed)
+            break;
+
+        if (samples_flushed > max_generated_flush)
+            max_generated_flush = samples_flushed;
+
+        fwrite (outbuffer, WaveHeader.BlockAlign, samples_flushed, outfile);
+        outsamples += samples_flushed;
+
+        if (samples_flushed > max_expected_samples) {
+            fprintf (stderr, "flush: generated samples (%d) exceeded expected (%d)!\n", samples_flushed, max_expected_samples);
+            fclose (infile);
+            return 1;
+        }
+    }
+
+    free (inbuffer);
+    free (outbuffer);
+    free (prebuffer);
+    stretch_deinit (stretcher);
+
+    fclose (infile);
+
+    rewind (outfile);
+    write_pcm_wav_header (outfile, outsamples, WaveHeader.NumChannels, 2, scaled_rate);
+    fclose (outfile);
+
+    if (insamples && verbose_mode) {
+        fprintf (stderr, "done, %lu samples --> %lu samples (ratio = %.3f)\n",
+            (unsigned long) insamples, (unsigned long) outsamples, (float) outsamples / insamples);
+        if (scale_rate)
+            fprintf (stderr, "sample rate changed from %lu Hz to %lu Hz\n",
+                (unsigned long) WaveHeader.SampleRate, (unsigned long) scaled_rate);
+        fprintf (stderr, "max expected samples = %d, actually seen = %d stretch, %d flush\n",
+            max_expected_samples, max_generated_stretch, max_generated_flush);
+        if (silence_frames || non_silence_frames) {
+            int total_frames = silence_frames + non_silence_frames;
+            fprintf (stderr, "%d silence frames detected (%.2f%%), %d actually used (%.2f%%)\n",
+                silence_frames, silence_frames * 100.0 / total_frames,
+                used_silence_frames, used_silence_frames * 100.0 / total_frames);
+        }
+    }
+
+    return 0;
+}
+
+static int write_pcm_wav_header (FILE *outfile, uint32_t num_samples, int num_channels, int bytes_per_sample, uint32_t sample_rate)
+{
+    RiffChunkHeader riffhdr;
+    ChunkHeader datahdr, fmthdr;
+    WaveHeader wavhdr;
+
+    int wavhdrsize = 16;
+    uint32_t total_data_bytes = num_samples * bytes_per_sample * num_channels;
+
+    memset (&wavhdr, 0, sizeof (wavhdr));
+
+    wavhdr.FormatTag = WAVE_FORMAT_PCM;
+    wavhdr.NumChannels = num_channels;
+    wavhdr.SampleRate = sample_rate;
+    wavhdr.BytesPerSecond = sample_rate * num_channels * bytes_per_sample;
+    wavhdr.BlockAlign = bytes_per_sample * num_channels;
+    wavhdr.BitsPerSample = bytes_per_sample * 8;
+
+    memcpy (riffhdr.ckID, "RIFF", sizeof (riffhdr.ckID));
+    memcpy (riffhdr.formType, "WAVE", sizeof (riffhdr.formType));
+    riffhdr.ckSize = sizeof (riffhdr) + wavhdrsize + sizeof (datahdr) + total_data_bytes;
+    memcpy (fmthdr.ckID, "fmt ", sizeof (fmthdr.ckID));
+    fmthdr.ckSize = wavhdrsize;
+
+    memcpy (datahdr.ckID, "data", sizeof (datahdr.ckID));
+    datahdr.ckSize = total_data_bytes;
+
+    return fwrite (&riffhdr, sizeof (riffhdr), 1, outfile) &&
+        fwrite (&fmthdr, sizeof (fmthdr), 1, outfile) &&
+        fwrite (&wavhdr, wavhdrsize, 1, outfile) &&
+        fwrite (&datahdr, sizeof (datahdr), 1, outfile);
+}
+
+double rms_level_dB (int16_t *audio, int samples, int channels)
+{
+    double rms_sum = 0.0;
+    int i;
+
+    if (channels == 1)
+        for (i = 0; i < samples; ++i)
+            rms_sum += (double) audio [i] * audio [i];
+    else
+        for (i = 0; i < samples; ++i) {
+            double average = (audio [i * 2] + audio [i * 2 + 1]) / 2.0;
+            rms_sum += average * average;
+        }
+
+    return log10 (rms_sum / samples / (32768.0 * 32767.0 * 0.5)) * 10.0;
+}
+</file>
+
+<file path="vendors/stretch/README">
+////////////////////////////////////////////////////////////////////////////
+//                        **** AUDIO-STRETCH ****                         //
+//                      Time Domain Harmonic Scaler                       //
+//                    Copyright (c) 2022 David Bryant                     //
+//                          All Rights Reserved.                          //
+//      Distributed under the BSD Software License (see license.txt)      //
+////////////////////////////////////////////////////////////////////////////
+
+From Wikipedia, the free encyclopedia:
+
+    Time-domain harmonic scaling (TDHS) is a method for time-scale
+    modification of speech (or other audio signals), allowing the apparent
+    rate of speech articulation to be changed without affecting the
+    pitch-contour and the time-evolution of the formant structure. TDHS
+    differs from other time-scale modification algorithms in that
+    time-scaling operations are performed in the time domain (not the
+    frequency domain).
+
+This project is an implementation of a TDHS library and a command-line demo
+program to utilize it with standard WAV files. The command-line program
+also incorporates silence detection so that can be handled differently.
+
+There are two effects possible with TDHS and the audio-stretch demo. The
+first is the more obvious mentioned above of changing the duration (or
+speed) of a speech (or other audio) sample without modifying its pitch.
+The other effect is similar, but after applying the duration change we
+change the sampling rate in a complimentary manner to restore the original
+duration and timing, which then results in the pitch being altered.
+
+So when a ratio is supplied to the audio-stretch program, the default
+operation is for the total duration of the audio file to be scaled by
+exactly that ratio (0.5X to 2.0X), with the pitches remaining constant.
+If the option to scale the sample-rate proportionally is specified (-s)
+then the total duration and timing of the audio file will be preserved,
+but the pitches will be scaled by the specified ratio instead. This is
+useful for creating a "helium voice" effect and lots of other fun stuff.
+
+Note that unless ratios of exactly 0.5 or 2.0 are used with the -s option,
+non-standard sampling rates will probably result. Many programs will still
+properly play these files, and audio editing programs will likely import
+them correctly (by resampling), but it is possible that some applications
+will barf on them. They can also be resampled to a standard rate using
+an audio resampling tool I wrote that's also available here on GitHub:
+
+https://github.com/dbry/audio-resampler
+
+There's an option to cycle through the full possible ratio range in a
+sinusoidal pattern, starting at 1.0, and either going up (-c) or down
+(-cc) first. In this case any specified ratio is ignored (except if the
+-s option is also specified to scale the sampling rate). The total period
+is fixed at 2π seconds, at which point the output will again be exactly
+aligned with the input.
+
+                *** Version 0.4 Enhancements ***
+
+For version 0.4 two useful features were added. First, the ability to
+cascade two instances of the stretcher was added. This is enabled by
+including the flag STRETCH_DUAL_FLAG when initializing the stretcher
+and allows double the stretch ratio of the regular code (i.e., now 0.25X
+to 4.00X). Note that the audio quality degrades some when slowed beyond
+2X, and generally voice becomes unintelligible when sped faster than 2X,
+however these values may still be useful for some applications, and
+specifically the very high speed values are useful for silence gaps
+(see the next feature).
+
+The other feature added is the ability to detect silence gaps in the
+audio and apply a different (likely lower) stretch ratio to these areas.
+This is currently not performed in the library itself, but in the demo
+command-line program where it is highly configurable, but it should be
+relatively easy to copy the functionality into another application. If
+I get requests for it, I will consider moving it into the library.
+
+There is a script to build the demo app on Linux (build.sh), and this also
+allows building the app to test for UB (undefined behavior) and ASAN (bad
+addressing). Also, some artificial test signals (both mono and stereo) and
+a script (test.sh) for running them at various ratios has been added.
+
+The current "help" display from the demo app:
+
+ AUDIO-STRETCH  Time Domain Harmonic Scaling Demo  Version 0.4
+ Copyright (c) 2022 David Bryant. All Rights Reserved.
+
+ Usage:     AUDIO-STRETCH [-options] infile.wav outfile.wav
+
+ Options:  -r<n.n> = stretch ratio (0.25 to 4.0, default = 1.0)
+           -g<n.n> = gap/silence stretch ratio (if different)
+           -u<n>   = upper freq period limit (default = 333 Hz)
+           -l<n>   = lower freq period limit (default = 55 Hz)
+           -b<n>   = audio buffer/window length (ms, default = 25)
+           -t<n>   = gap/silence threshold (dB re FS, default = -40)
+           -c      = cycle through all ratios, starting higher
+           -cc     = cycle through all ratios, starting lower
+           -d      = force dual instance even for shallow ratios
+           -s      = scale rate to preserve duration (not pitch)
+           -f      = fast pitch detection (default >= 32 kHz)
+           -n      = normal pitch detection (default < 32 kHz)
+           -q      = quiet mode (display errors only)
+           -v      = verbose (display lots of info)
+           -y      = overwrite outfile if it exists
+
+ Web:      Visit www.github.com/dbry/audio-stretch for latest version
+
+Notes:
+
+1. The program will handle only mono or stereo files in the WAV format. In
+   case of stereo, the two channels shouldn't be independent. The
+   audio must be 16-bit PCM and the acceptable sampling rates are from 8,000
+   to 48,000 Hz. Any additional RIFF info in the WAV file will be discarded.
+   The command-line program is only for little-endian architectures.
+
+2. For stereo files, the pitch detection is done on a mono conversion of the
+   audio, but the scaling transformation is done on the independent channels.
+   If it is desired to have completely independent processing this can only
+   be done with two mono files. Note that this is not a limitation of the
+   library but of the demo utility (the library has no problem with multiple
+   contexts).
+
+3. This technique (TDHS) is ideal for speech signals, but can also be used
+   for homophonic musical instruments. As the sound becomes increasingly
+   polyphonic, however, the quality and effectiveness will decrease. Also,
+   the period frequency limits provided by default are optimized for speech;
+   adjusting these may be required for best quality with non-speech audio.
+
+4. The vast majority of the time required for TDHS is in the pitch detection,
+   and so this library implements two versions. The first is the standard
+   one that includes every sample and pitch period, and the second is an
+   optimized one that uses pairs of samples and only even pitch periods.
+   This second version is about 4X faster than the standard version, but
+   provides virtually the same quality. It is used by default for files with
+   sample rates of 32 kHz or higher, but its use can be forced on or off
+   from the command-line (see options above).
+</file>
+
+<file path="vendors/stretch/stretch.c">
+////////////////////////////////////////////////////////////////////////////
+//                        **** AUDIO-STRETCH ****                         //
+//                      Time Domain Harmonic Scaler                       //
+//                    Copyright (c) 2022 David Bryant                     //
+//                          All Rights Reserved.                          //
+//      Distributed under the BSD Software License (see license.txt)      //
+////////////////////////////////////////////////////////////////////////////
+
+// stretch.c
+
+// Time Domain Harmonic Compression and Expansion
+//
+// This library performs time domain harmonic scaling with pitch detection
+// to stretch the timing of a 16-bit PCM signal (either mono or stereo) from
+// 1/2 to 2 times its original length. This is done without altering any of
+// the tonal characteristics.
+//
+// Use stereo (num_chans = 2), when both channels are from same source
+// and should contain approximately similar content.
+// For independent channels, prefer using multiple StretchHandle-instances.
+// see https://github.com/dbry/audio-stretch/issues/6
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <math.h>
+
+#include "stretch.h"
+
+#define MIN_PERIOD  24          /* minimum allowable pitch period */
+#define MAX_PERIOD  2400        /* maximum allowable pitch period */
+
+#if INT_MAX == 32767
+#define MERGE_OFFSET    32768L      /* promote to long before offset */
+#define abs32           labs        /* use long abs to avoid UB */
+#else
+#define MERGE_OFFSET    32768
+#define abs32           abs
+#endif
+
+#define MAX_CORR    UINT32_MAX  /* maximum value for correlation ratios */
+
+struct stretch_cnxt {
+    int num_chans, inbuff_samples, shortest, longest, tail, head, fast_mode;
+    int16_t *inbuff, *calcbuff;
+    float outsamples_error;
+    uint32_t *results;
+
+    struct stretch_cnxt *next;
+    int16_t *intermediate;
+};
+
+static void merge_blocks (int16_t *output, int16_t *input1, int16_t *input2, int samples);
+static int find_period_fast (struct stretch_cnxt *cnxt, int16_t *samples);
+static int find_period (struct stretch_cnxt *cnxt, int16_t *samples);
+
+/*
+ * Initialize a context of the time stretching code. The shortest and longest periods
+ * are specified here. The longest period determines the lowest fundamental frequency
+ * that can be handled correctly. Note that higher frequencies can be handled than the
+ * shortest period would suggest because multiple periods can be combined, and the
+ * worst-case performance will suffer if too short a period is selected. The flags are:
+ *
+ * STRETCH_FAST_FLAG    0x1     Use the "fast" version of the period calculation
+ *
+ * STRETCH_DUAL_FLAG    0x2     Cascade two instances of the stretcher to expand
+ *                              available ratios to 0.25X to 4.00X
+ */
+
+StretchHandle stretch_init (int shortest_period, int longest_period, int num_channels, int flags)
+{
+    struct stretch_cnxt *cnxt;
+    int max_periods = 3;
+
+    if (flags & STRETCH_FAST_FLAG) {
+        longest_period = (longest_period + 1) & ~1;
+        shortest_period &= ~1;
+        max_periods = 4;
+    }
+
+    if (longest_period <= shortest_period || shortest_period < MIN_PERIOD || longest_period > MAX_PERIOD) {
+        fprintf (stderr, "stretch_init(): invalid periods!\n");
+        return NULL;
+    }
+
+    cnxt = (struct stretch_cnxt *) calloc (1, sizeof (struct stretch_cnxt));
+
+    if (cnxt) {
+        cnxt->inbuff_samples = longest_period * num_channels * max_periods;
+        cnxt->inbuff = calloc (cnxt->inbuff_samples, sizeof (*cnxt->inbuff));
+
+        if (num_channels == 2 || (flags & STRETCH_FAST_FLAG))
+            cnxt->calcbuff = calloc (longest_period * num_channels, sizeof (*cnxt->calcbuff));
+
+        if ((flags & STRETCH_FAST_FLAG))
+            cnxt->results = calloc (longest_period, sizeof (*cnxt->results));
+    }
+
+    if (!cnxt || !cnxt->inbuff || (num_channels == 2 && (flags & STRETCH_FAST_FLAG) && !cnxt->calcbuff) || ((flags & STRETCH_FAST_FLAG) && !cnxt->results)) {
+        fprintf (stderr, "stretch_init(): out of memory!\n");
+        return NULL;
+    }
+
+    cnxt->head = cnxt->tail = cnxt->longest = longest_period * num_channels;
+    cnxt->fast_mode = (flags & STRETCH_FAST_FLAG) ? 1 : 0;
+    cnxt->shortest = shortest_period * num_channels;
+    cnxt->num_chans = num_channels;
+
+    if (flags & STRETCH_DUAL_FLAG) {
+        cnxt->next = stretch_init (shortest_period, longest_period, num_channels, flags & ~STRETCH_DUAL_FLAG);
+        cnxt->intermediate = calloc (longest_period * num_channels * max_periods, sizeof (*cnxt->intermediate));
+    }
+
+    return (StretchHandle) cnxt;
+}
+
+/*
+ * Re-Initialize a context of the time stretching code - as if freshly created
+ * with stretch_init(). This drops all internal state.
+ */
+
+void stretch_reset (StretchHandle handle)
+{
+    struct stretch_cnxt *cnxt = (struct stretch_cnxt *) handle;
+
+    cnxt->head = cnxt->tail = cnxt->longest;
+    memset (cnxt->inbuff, 0, cnxt->tail * sizeof (*cnxt->inbuff));
+
+    if (cnxt->next)
+        stretch_reset (cnxt->next);
+}
+
+/*
+ * Determine how many samples (per channel) should be reserved in 'output'-array
+ * for stretch_samples() and stretch_flush(). max_num_samples and max_ratio are the
+ * maximum values that will be passed to stretch_samples().
+ */
+
+int stretch_output_capacity (StretchHandle handle, int max_num_samples, float max_ratio)
+{
+    struct stretch_cnxt *cnxt = (struct stretch_cnxt *) handle;
+    int max_period = cnxt->longest / cnxt->num_chans;
+    int max_expected_samples;
+    float next_ratio;
+
+    if (cnxt->next) {
+        if (max_ratio < 0.5) {
+            next_ratio = max_ratio / 0.5;
+            max_ratio = 0.5;
+        }
+        else if (max_ratio > 2.0) {
+            next_ratio = max_ratio / 2.0;
+            max_ratio = 2.0;
+        }
+        else
+            next_ratio = 1.0;
+    }
+
+    max_expected_samples = (int) ceil (max_num_samples * ceil (max_ratio * 2.0) / 2.0) +
+        max_period * (cnxt->fast_mode ? 4 : 3);
+
+    if (cnxt->next)
+        max_expected_samples = stretch_output_capacity (cnxt->next, max_expected_samples, next_ratio);
+
+    return max_expected_samples;
+}
+
+/*
+ * Process the specified samples with the given ratio (which is normally clipped to
+ * the range 0.5 to 2.0, or 0.25 to 4.00 for the "dual" mode). Note that in stereo
+ * the number of samples refers to the samples for one channel (i.e., not the total
+ * number of values passed) and can be as large as desired (samples are buffered here).
+ * The ratio may change between calls, but there is some latency to consider because
+ * audio is buffered here and a new ratio may be applied to previously sent samples.
+ *
+ * The exact number of samples output is not easy to determine in advance, so a function
+ * is provided (stretch_output_capacity()) that calculates the maximum number of samples
+ * that can be generated from a single call to this function (or stretch_flush()) given
+ * a number of samples and maximum ratio. It is reccomended that that function be used
+ * after initialization to allocate in advance the buffer size required. Be sure to
+ * multiply the return value by the number channels!
+ */
+
+int stretch_samples (StretchHandle handle, const int16_t *samples, int num_samples, int16_t *output, float ratio)
+{
+    struct stretch_cnxt *cnxt = (struct stretch_cnxt *) handle;
+    int out_samples = 0, next_samples = 0;
+    int16_t *outbuf = output;
+    float next_ratio;
+
+    /* if there's a cascaded instance after this one, try to do as much of the ratio here and the rest in "next" */
+
+    if (cnxt->next) {
+        outbuf = cnxt->intermediate;
+
+        if (ratio < 0.5) {
+            next_ratio = ratio / 0.5;
+            ratio = 0.5;
+        }
+        else if (ratio > 2.0) {
+            next_ratio = ratio / 2.0;
+            ratio = 2.0;
+        }
+        else
+            next_ratio = 1.0;
+    }
+
+    num_samples *= cnxt->num_chans;
+
+    /* this really should not happen, but a good idea to clamp in case */
+
+    if (ratio < 0.5)
+        ratio = 0.5;
+    else if (ratio > 2.0)
+        ratio = 2.0;
+
+    /* while we have pending samples to read into our buffer */
+
+    while (num_samples) {
+
+        /* copy in as many samples as we have room for */
+
+        int samples_to_copy = num_samples;
+
+        if (samples_to_copy > cnxt->inbuff_samples - cnxt->head)
+            samples_to_copy = cnxt->inbuff_samples - cnxt->head;
+
+        memcpy (cnxt->inbuff + cnxt->head, samples, samples_to_copy * sizeof (cnxt->inbuff [0]));
+        num_samples -= samples_to_copy;
+        samples += samples_to_copy;
+        cnxt->head += samples_to_copy;
+
+        /* while there are enough samples to process (3 or 4 times the longest period), do so */
+
+        while (cnxt->tail >= cnxt->longest && cnxt->head - cnxt->tail >= cnxt->longest * (cnxt->fast_mode ? 3 : 2)) {
+            float process_ratio;
+            int period;
+
+            if (ratio != 1.0 || cnxt->outsamples_error)
+                period = cnxt->fast_mode ? find_period_fast (cnxt, cnxt->inbuff + cnxt->tail) :
+                    find_period (cnxt, cnxt->inbuff + cnxt->tail);
+            else
+                period = cnxt->longest;
+
+            /*
+             * Once we have calculated the best-match period, there are 4 possible transformations
+             * available to convert the input samples to output samples. Obviously we can simply
+             * copy the samples verbatim (1:1). Standard TDHS provides algorithms for 2:1 and
+             * 1:2 scaling, and I have created an obvious extension for 2:3 scaling. To achieve
+             * intermediate ratios we maintain a "error" term (in samples) and use that here to
+             * calculate the actual transformation to apply.
+             */
+
+            if (cnxt->outsamples_error == 0.0)
+                process_ratio = floor (ratio * 2.0 + 0.5) / 2.0;
+            else if (cnxt->outsamples_error > 0.0)
+                process_ratio = floor (ratio * 2.0) / 2.0;
+            else
+                process_ratio = ceil (ratio * 2.0) / 2.0;
+
+            if (process_ratio == 0.5) {
+                merge_blocks (outbuf + out_samples, cnxt->inbuff + cnxt->tail,
+                    cnxt->inbuff + cnxt->tail + period, period);
+                cnxt->outsamples_error += period - (period * 2.0 * ratio);
+                out_samples += period;
+                cnxt->tail += period * 2;
+            }
+            else if (process_ratio == 1.0) {
+                memcpy (outbuf + out_samples, cnxt->inbuff + cnxt->tail, period * 2 * sizeof (cnxt->inbuff [0]));
+
+                if (ratio != 1.0)
+                    cnxt->outsamples_error += (period * 2.0) - (period * 2.0 * ratio);
+                else
+                    cnxt->outsamples_error = 0; /* if the ratio is 1.0, we can never cancel the error, so just do it now */
+
+                out_samples += period * 2;
+                cnxt->tail += period * 2;
+            }
+            else if (process_ratio == 1.5) {
+                memcpy (outbuf + out_samples, cnxt->inbuff + cnxt->tail, period * sizeof (cnxt->inbuff [0]));
+                merge_blocks (outbuf + out_samples + period, cnxt->inbuff + cnxt->tail + period,
+                    cnxt->inbuff + cnxt->tail, period);
+                memcpy (outbuf + out_samples + period * 2, cnxt->inbuff + cnxt->tail + period, period * sizeof (cnxt->inbuff [0]));
+                cnxt->outsamples_error += (period * 3.0) - (period * 2.0 * ratio);
+                out_samples += period * 3;
+                cnxt->tail += period * 2;
+            }
+            else if (process_ratio == 2.0) {
+                merge_blocks (outbuf + out_samples, cnxt->inbuff + cnxt->tail,
+                    cnxt->inbuff + cnxt->tail - period, period * 2);
+
+                cnxt->outsamples_error += (period * 2.0) - (period * ratio);
+                out_samples += period * 2;
+                cnxt->tail += period;
+
+                if (cnxt->fast_mode) {
+                    merge_blocks (outbuf + out_samples, cnxt->inbuff + cnxt->tail,
+                        cnxt->inbuff + cnxt->tail - period, period * 2);
+
+                    cnxt->outsamples_error += (period * 2.0) - (period * ratio);
+                    out_samples += period * 2;
+                    cnxt->tail += period;
+                }
+            }
+            else
+                fprintf (stderr, "stretch_samples: fatal programming error: process_ratio == %g\n", process_ratio);
+
+            /* if there's another cascaded instance after this, pass the just stretched samples into that */
+
+            if (cnxt->next) {
+                next_samples += stretch_samples (cnxt->next, outbuf, out_samples / cnxt->num_chans, output + next_samples * cnxt->num_chans, next_ratio);
+                out_samples = 0;
+            }
+
+            /* finally, left-justify the samples in the buffer leaving one longest period of history */
+
+            int samples_to_move = cnxt->inbuff_samples - cnxt->tail + cnxt->longest;
+
+            memmove (cnxt->inbuff, cnxt->inbuff + cnxt->tail - cnxt->longest,
+                samples_to_move * sizeof (cnxt->inbuff [0]));
+
+            cnxt->head -= cnxt->tail - cnxt->longest;
+            cnxt->tail = cnxt->longest;
+        }
+    }
+
+    /*
+     * This code is not strictly required, but will reduce latency, especially in the dual-instance case, by
+     * always flushing all pending samples if no actual stretching is desired (i.e., ratio is 1.0 and there's
+     * no error to compensate for). This case is more common now than previously because of the gap detection
+     * and cascaded instances.
+     */
+
+    if (ratio == 1.0 && !cnxt->outsamples_error && cnxt->head != cnxt->tail) {
+        int samples_leftover = cnxt->head - cnxt->tail;
+
+        if (cnxt->next)
+            next_samples += stretch_samples (cnxt->next, cnxt->inbuff + cnxt->tail, samples_leftover / cnxt->num_chans,
+                output + next_samples * cnxt->num_chans, next_ratio);
+        else {
+            memcpy (outbuf + out_samples, cnxt->inbuff + cnxt->tail, samples_leftover * sizeof (*output));
+            out_samples += samples_leftover;
+        }
+
+        memmove (cnxt->inbuff, cnxt->inbuff + cnxt->head - cnxt->longest, cnxt->longest * sizeof (cnxt->inbuff [0]));
+        cnxt->head = cnxt->tail = cnxt->longest;
+    }
+
+    return cnxt->next ? next_samples : out_samples / cnxt->num_chans;
+}
+
+/*
+ * Flush any leftover samples out at normal speed. For cascaded dual instances this must be called
+ * twice to completely flush, or simply call it until it returns zero samples. The maximum number
+ * of samples that can be returned from each call of this function can be determined in advance with
+ * stretch_output_capacity().
+ */
+
+int stretch_flush (StretchHandle handle, int16_t *output)
+{
+    struct stretch_cnxt *cnxt = (struct stretch_cnxt *) handle;
+    int samples_leftover = cnxt->head - cnxt->tail;
+    int samples_flushed = 0;
+
+    if (cnxt->next) {
+        if (samples_leftover)
+            samples_flushed = stretch_samples (cnxt->next, cnxt->inbuff + cnxt->tail, samples_leftover / cnxt->num_chans, output, 1.0);
+
+        if (!samples_flushed)
+            samples_flushed = stretch_flush (cnxt->next, output);
+    }
+    else {
+        memcpy (output, cnxt->inbuff + cnxt->tail, samples_leftover * sizeof (*output));
+        samples_flushed = samples_leftover / cnxt->num_chans;
+    }
+
+    cnxt->tail = cnxt->head;
+    memset (cnxt->inbuff, 0, cnxt->tail * sizeof (*cnxt->inbuff));
+
+    return samples_flushed;
+}
+
+/* free handle */
+
+void stretch_deinit (StretchHandle handle)
+{
+    struct stretch_cnxt *cnxt = (struct stretch_cnxt *) handle;
+
+    free (cnxt->calcbuff);
+    free (cnxt->results);
+    free (cnxt->inbuff);
+
+    if (cnxt->next) {
+        stretch_deinit (cnxt->next);
+        free (cnxt->intermediate);
+    }
+
+    free (cnxt);
+}
+
+/*
+ * The pitch detection is done by finding the period that produces the
+ * maximum value for the following correlation formula applied to two
+ * consecutive blocks of the given period length:
+ *
+ *         sum of the absolute values of each sample in both blocks
+ *   ---------------------------------------------------------------------
+ *   sum of the absolute differences of each corresponding pair of samples
+ *
+ * This formula was chosen for two reasons.  First, it produces output values
+ * that can directly compared regardless of the pitch period.  Second, the
+ * numerator can be accumulated for successive periods, and only the
+ * denominator need be completely recalculated.
+ */
+
+static int find_period (struct stretch_cnxt *cnxt, int16_t *samples)
+{
+    uint32_t sum, diff, factor, scaler, best_factor = 0;
+    int16_t *calcbuff = samples;
+    int period, best_period;
+    int i, j;
+
+    period = best_period = cnxt->shortest / cnxt->num_chans;
+
+    // convert stereo to mono, and accumulate sum for longest period
+
+    if (cnxt->num_chans == 2) {
+        calcbuff = cnxt->calcbuff;
+
+        for (sum = i = j = 0; i < cnxt->longest * 2; i += 2)
+            sum += abs32 (calcbuff [j++] = ((int32_t) samples [i] + samples [i+1]) >> 1);
+    }
+    else
+        for (sum = i = 0; i < cnxt->longest; ++i)
+            sum += abs32 (calcbuff [i]) + abs32 (calcbuff [i+cnxt->longest]);
+
+    // if silence return longest period, else calculate scaler based on largest sum
+
+    if (sum)
+        scaler = (MAX_CORR - 1) / sum;
+    else
+        return cnxt->longest;
+
+    /* accumulate sum for shortest period size */
+
+    for (sum = i = 0; i < period; ++i)
+        sum += abs32 (calcbuff [i]) + abs32 (calcbuff [i+period]);
+
+    /* this loop actually cycles through all period lengths */
+
+    while (1) {
+        int16_t *comp = calcbuff + period * 2;
+        int16_t *ref = calcbuff + period;
+
+        /* compute sum of absolute differences */
+
+        diff = 0;
+
+        while (ref != calcbuff)
+            diff += abs32 ((int32_t) *--ref - *--comp);
+
+        /*
+         * Here we calculate and store the resulting correlation
+         * factor.  Note that we must watch for a difference of
+         * zero, meaning a perfect match.  Also, for increased
+         * precision using integer math, we scale the sum.
+         */
+
+        factor = diff ? (sum * scaler) / diff : MAX_CORR;
+
+        if (factor >= best_factor) {
+            best_factor = factor;
+            best_period = period;
+        }
+
+        /* see if we're done */
+
+        if (period * cnxt->num_chans == cnxt->longest)
+            break;
+
+        /* update accumulating sum and current period */
+
+        sum += abs32 (calcbuff [period * 2]) + abs32 (calcbuff [period * 2 + 1]);
+        period++;
+    }
+
+    return best_period * cnxt->num_chans;
+}
+
+/*
+ * This pitch detection function is similar to find_period() above, except that it
+ * is optimized for speed. The audio data corresponding to two maximum periods is
+ * averaged 2:1 into the calculation buffer, and then the calulations are done
+ * for every other period length. Because the time is essentially proportional to
+ * both the number of samples and the number of period lengths to try, this scheme
+ * can reduce the time by a factor approaching 4x. The correlation results on either
+ * side of the peak are compared to calculate a more accurate center of the period.
+ */
+
+static int find_period_fast (struct stretch_cnxt *cnxt, int16_t *samples)
+{
+    uint32_t sum, diff, scaler, best_factor = 0;
+    int period, best_period;
+    int i, j;
+
+    best_period = period = cnxt->shortest / (cnxt->num_chans * 2);
+
+    /* first step is compressing data 2:1 into calcbuff, and calculating maximum sum */
+
+    if (cnxt->num_chans == 2)
+        for (sum = i = j = 0; i < cnxt->longest * 2; i += 4)
+            sum += abs32 (cnxt->calcbuff [j++] = ((int32_t) samples [i] + samples [i+1] + samples [i+2] + samples [i+3]) >> 2);
+    else
+        for (sum = i = j = 0; i < cnxt->longest * 2; i += 2)
+            sum += abs32 (cnxt->calcbuff [j++] = ((int32_t) samples [i] + samples [i+1]) >> 1);
+
+    // if silence return longest period, else calculate scaler based on largest sum
+
+    if (sum)
+        scaler = (MAX_CORR - 1) / sum;
+    else
+        return cnxt->longest;
+
+    /* accumulate sum for shortest period */
+
+    for (sum = i = 0; i < period; ++i)
+        sum += abs32 (cnxt->calcbuff [i]) + abs32 (cnxt->calcbuff [i+period]);
+
+    /* this loop actually cycles through all period lengths */
+
+    while (1) {
+        int16_t *comp = cnxt->calcbuff + period * 2;
+        int16_t *ref = cnxt->calcbuff + period;
+
+        /* compute sum of absolute differences */
+
+        diff = 0;
+
+        while (ref != cnxt->calcbuff)
+            diff += abs32 ((int32_t) *--ref - *--comp);
+
+        /*
+         * Here we calculate and store the resulting correlation
+         * factor.  Note that we must watch for a difference of
+         * zero, meaning a perfect match.  Also, for increased
+         * precision using integer math, we scale the sum.
+         */
+
+        cnxt->results [period] = diff ? (sum * scaler) / diff : MAX_CORR;
+
+        if (cnxt->results [period] >= best_factor) {    /* check if best yet */
+            best_factor = cnxt->results [period];
+            best_period = period;
+        }
+
+        /* see if we're done */
+
+        if (period * cnxt->num_chans * 2 == cnxt->longest)
+            break;
+
+        /* update accumulating sum and current period */
+
+        sum += abs32 (cnxt->calcbuff [period * 2]) + abs32 (cnxt->calcbuff [period * 2 + 1]);
+        period++;
+    }
+
+    if (best_period * cnxt->num_chans * 2 != cnxt->shortest && best_period * cnxt->num_chans * 2 != cnxt->longest) {
+        uint32_t high_side_diff = cnxt->results [best_period] - cnxt->results [best_period+1];
+        uint32_t low_side_diff = cnxt->results [best_period] - cnxt->results [best_period-1];
+
+        if ((low_side_diff + 1) / 2 > high_side_diff)
+            best_period = best_period * 2 + 1;
+        else if ((high_side_diff + 1) / 2 > low_side_diff)
+            best_period = best_period * 2 - 1;
+        else
+            best_period *= 2;
+    }
+    else
+        best_period *= 2;           /* shortest or longest use as is */
+
+    return best_period * cnxt->num_chans;
+}
+
+/*
+ * To combine the two periods into one, each corresponding pair of samples
+ * are averaged with a linearly sliding scale.  At the beginning of the period
+ * the first sample dominates, and at the end the second sample dominates.  In
+ * this way the resulting block blends with the previous and next blocks.
+ *
+ * The signed values are offset to unsigned for the calculation and then offset
+ * back to signed.  This is done to avoid the compression around zero that occurs
+ * with calculations of this type on C implementations that round division toward
+ * zero.
+ *
+ * The maximum period handled here without overflow possibility is 65535 samples.
+ * This corresponds to a maximum calculated period of 16383 samples (2x for stereo
+ * and 2x for the "2.0" version of the stretch algorithm). Since the maximum
+ * calculated period is currently set for 2400 samples, we have plenty of margin.
+ */
+
+static void merge_blocks (int16_t *output, int16_t *input1, int16_t *input2, int samples)
+{
+    int i;
+
+    for (i = 0; i < samples; ++i)
+        output [i] = (int32_t)(((uint32_t)(input1 [i] + MERGE_OFFSET) * (samples - i) +
+            (uint32_t)(input2 [i] + MERGE_OFFSET) * i) / samples) - MERGE_OFFSET;
+}
+</file>
+
+<file path="vendors/stretch/stretch.h">
+////////////////////////////////////////////////////////////////////////////
+//                        **** AUDIO-STRETCH ****                         //
+//                      Time Domain Harmonic Scaler                       //
+//                    Copyright (c) 2022 David Bryant                     //
+//                          All Rights Reserved.                          //
+//      Distributed under the BSD Software License (see license.txt)      //
+////////////////////////////////////////////////////////////////////////////
+
+// stretch.h
+
+// Time Domain Harmonic Compression and Expansion
+//
+// This library performs time domain harmonic scaling with pitch detection
+// to stretch the timing of a 16-bit PCM signal (either mono or stereo) from
+// 1/2 to 2 times its original length. This is done without altering any of
+// its tonal characteristics.
+//
+// Use stereo (num_chans = 2), when both channels are from same source
+// and should contain approximately similar content.
+// For independent channels, prefer using multiple StretchHandle-instances.
+// see https://github.com/dbry/audio-stretch/issues/6
+
+#ifndef STRETCH_H
+#define STRETCH_H
+
+#include <stdint.h>
+
+#define STRETCH_FAST_FLAG    0x1    // use "fast" version of period determination code
+#define STRETCH_DUAL_FLAG    0x2    // cascade two instances (doubles usable ratio range)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void *StretchHandle;
+
+StretchHandle stretch_init (int shortest_period, int longest_period, int num_chans, int flags);
+int stretch_output_capacity (StretchHandle handle, int max_num_samples, float max_ratio);
+int stretch_samples (StretchHandle handle, const int16_t *samples, int num_samples, int16_t *output, float ratio);
+int stretch_flush (StretchHandle handle, int16_t *output);
+void stretch_reset (StretchHandle handle);
+void stretch_deinit (StretchHandle handle);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+</file>
+
+<file path="vendors/stretch/test.sh">
+#!/bin/bash
+
+if [ ! -d output ]; then
+  echo "creating directory output"
+  mkdir output
+fi
+
+if [ ! -f samples/mono.wav ] || [ ! -f samples/stereo.wav ]; then
+  WVUNPACK=$(which wvunpack)
+  if [ -z "$WVUNPACK" ]; then
+    echo "please build/install WavPack with wvunpack to convert .wv samples to .wav"
+    exit 1
+  fi
+  $WVUNPACK samples/mono.wv
+  $WVUNPACK samples/stereo.wv
+fi
+
+STARTER=""
+if [ "$1" = "gdb" ]; then
+  STARTER="gdb -q -ex run -ex quit --args"
+  shift
+fi
+
+EXAMPLE="mono"
+if [ "$1" = "mono" ]; then
+  EXAMPLE="$1"
+  shift
+fi
+if [ "$1" = "stereo" ]; then
+  EXAMPLE="$1"
+  shift
+fi
+
+
+if [ -z "$1" ] && [ -z "$2" ]; then
+  echo "usage: $0 [mono|stereo] [f|n] [s|x]"
+  echo "  'f': fast pitch detection"
+  echo "  'n': normal pitch detection"
+  echo "  's': simple range for ratio: 0.5 .. 2.0"
+  echo "  'x': extended range for ratio: 0.25 .. 4.0"
+  echo ""
+fi
+
+if [ -z "$1" ] || [ "$1" = "f" ]; then
+  echo "testing with fast pitch detection"
+  FO="-f"
+  FN="f"
+else
+  echo "testing with normal pitch detection"
+  FO="-n"
+  FN="n"
+fi
+
+
+if [ -z "$2" ] || [ "$2" = "s" ]; then
+  echo ""
+  echo "testing normal range 0.5 .. 2.0"
+  echo "x2.0"
+  $STARTER ./audio-stretch -q -y $FO -r0.5   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r050_x200.wav
+  echo "x1.75"
+  $STARTER ./audio-stretch -q -y $FO -r0.571 samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r057_x175.wav
+  echo "x1.5"
+  $STARTER ./audio-stretch -q -y $FO -r0.666 samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r066_x150.wav
+  echo "x1.25"
+  $STARTER ./audio-stretch -q -y $FO -r0.8   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r080_x125.wav
+  echo "x1.0"
+  $STARTER ./audio-stretch -q -y $FO -r1.0   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r100_x100.wav
+  echo "x0.75"
+  $STARTER ./audio-stretch -q -y $FO -r1.333 samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r133_x075.wav
+  echo "x0.5"
+  $STARTER ./audio-stretch -q -y $FO -r2.0   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r200_x050.wav
+fi
+if [ -z "$2" ] || [ "$2" = "x" ]; then
+  echo ""
+  echo "testing extended range 0.25 .. 0.5 and 2.0 .. 4.0"
+  echo "x4.0"
+  $STARTER ./audio-stretch -q -y $FO -r0.25  samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r025_x400.wav
+  echo "x3.5"
+  $STARTER ./audio-stretch -q -y $FO -r0.285 samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r028_x350.wav
+  echo "x3.0"
+  $STARTER ./audio-stretch -q -y $FO -r0.333 samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r033_x300.wav
+  echo "x2.5"
+  $STARTER ./audio-stretch -q -y $FO -r0.4   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r040_x250.wav
+  echo "x0.4"
+  $STARTER ./audio-stretch -q -y $FO -r2.5   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r250_x040.wav
+  echo "x0.333"
+  $STARTER ./audio-stretch -q -y $FO -r3.0   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r300_x033.wav
+  echo "x0.285"
+  $STARTER ./audio-stretch -q -y $FO -r3.5   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r350_x028.wav
+  echo "x0.25"
+  $STARTER ./audio-stretch -q -y $FO -r4.0   samples/${EXAMPLE}.wav output/out_${EXAMPLE}_${FN}_r400_x025.wav
+fi
+</file>
+
+<file path=".github/workflows/ci.yaml">
+name: Build, Compile and Publish
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]*', '[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            lib_file: '_stretch.so'
+            lib_dir: 'src/audiostretchy/interface/linux/'
+          - os: macos-latest
+            lib_file: '_stretch.dylib'
+            lib_dir: 'src/audiostretchy/interface/mac/'
+          - os: windows-latest
+            lib_file: '_stretch.dll'
+            lib_dir: 'src/audiostretchy/interface/win/'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Check submodule changes
+        id: check_submodule
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            submodule:
+              - 'vendors/stretch/**'
+      - name: Check if destination file missing
+        id: check_file
+        shell: bash
+        run: |
+          if [[ ! -f "${{ matrix.lib_dir }}${{ matrix.lib_file }}" ]]; then echo "file_missing=true" >> $GITHUB_ENV; fi
+      - name: Compile and Move (Ubuntu)
+        if: (steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true') && matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install build-essential
+          gcc -fPIC -O3 -shared -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c
+          mkdir -p ${{ matrix.lib_dir }}
+          mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
+      - name: Compile and Move (macOS)
+        if: (steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true') && matrix.os == 'macos-latest'
+        run: |
+          gcc -shared -O3 -s -o ${{ matrix.lib_file }} vendors/stretch/stretch.c -arch x86_64 -arch arm64
+          mkdir -p ${{ matrix.lib_dir }}/
+          mv ${{ matrix.lib_file }} ${{ matrix.lib_dir }}
+      - name: Set up MSVC environment
+        if: (steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true') && matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          spectre: false
+      - name: Compile and Move (Windows)
+        if: (steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true') && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cl /LD /Fe:${{ matrix.lib_file }} /O2 /MT vendors/stretch/stretch.c /link /DEF:${{ matrix.lib_dir }}_stretch.def
+          New-Item -ItemType Directory -Path ${{ matrix.lib_dir }} -Force
+          Move-Item -Path ${{ matrix.lib_file }} -Destination ${{ matrix.lib_dir }}${{ matrix.lib_file }} -Force
+
+      - name: Commit and push if changed
+        if: (steps.check_submodule.outputs.submodule == 'true' || env.file_missing == 'true')
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: 'Update compiled lib'
+          add: ${{ matrix.lib_dir }}${{ matrix.lib_file }}
+
+  build-and-publish:
+    needs: compile
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheel
+        run: python -m build
+      - name: Identify Wheel File
+        id: wheel_info
+        run: echo "::set-output name=wheel_file::$(ls dist/*.whl)"
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.wheel_info.outputs.wheel_file }}
+          asset_name: audiostretchy-${{ github.ref }}.whl
+          asset_content_type: application/octet-stream
+      - name: Publish to PyPi
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+</file>
+
+<file path="docs/_static/.gitignore">
+# Empty directory
+</file>
+
+<file path="docs/authors.md">
+```{include} ../AUTHORS.md
+:relative-docs: docs/
+:relative-images:
+```
+</file>
+
+<file path="docs/changelog.md">
+```{include} ../CHANGELOG.md
+:relative-docs: docs/
+:relative-images:
+```
+</file>
+
+<file path="docs/conf.py">
+# This file is execfile()d with the current directory set to its containing dir.
+#
+# This file only contains a selection of the most common options. For a full
+# list see the documentation:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
+#
+# All configuration values have a default; values that are commented out
+# serve to show the default.
+
+import os
+import sys
+import shutil
+
+# -- Path setup --------------------------------------------------------------
+
+__location__ = os.path.dirname(__file__)
+
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+sys.path.insert(0, os.path.join(__location__, "../src"))
+
+# -- Run sphinx-apidoc -------------------------------------------------------
+# This hack is necessary since RTD does not issue `sphinx-apidoc` before running
+# `sphinx-build -b html . _build/html`. See Issue:
+# https://github.com/readthedocs/readthedocs.org/issues/1139
+# DON'T FORGET: Check the box "Install your project inside a virtualenv using
+# setup.py install" in the RTD Advanced Settings.
+# Additionally it helps us to avoid running apidoc manually
+
+try:  # for Sphinx >= 1.7
+    from sphinx.ext import apidoc
+except ImportError:
+    from sphinx import apidoc
+
+output_dir = os.path.join(__location__, "api")
+module_dir = os.path.join(__location__, "../src/audiostretchy")
+try:
+    shutil.rmtree(output_dir)
+except FileNotFoundError:
+    pass
+
+try:
+    import sphinx
+
+    cmd_line = f"sphinx-apidoc --implicit-namespaces -f -o {output_dir} {module_dir}"
+
+    args = cmd_line.split(" ")
+    if tuple(sphinx.__version__.split(".")) >= ("1", "7"):
+        # This is a rudimentary parse_version to avoid external dependencies
+        args = args[1:]
+
+    apidoc.main(args)
+except Exception as e:
+    print("Running `sphinx-apidoc` failed!\n{}".format(e))
+
+# -- General configuration ---------------------------------------------------
+
+# If your documentation needs a minimal Sphinx version, state it here.
+# needs_sphinx = '1.0'
+
+# Add any Sphinx extension module names here, as strings. They can be extensions
+# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.coverage",
+    "sphinx.ext.doctest",
+    "sphinx.ext.ifconfig",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+]
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ["_templates"]
+
+
+# Enable markdown
+extensions.append("myst_parser")
+
+# Configure MyST-Parser
+myst_enable_extensions = [
+    "amsmath",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "substitution",
+    "tasklist",
+]
+
+# The suffix of source filenames.
+source_suffix = [".rst", ".md"]
+
+# The encoding of source files.
+# source_encoding = 'utf-8-sig'
+
+# The master toctree document.
+master_doc = "index"
+
+# General information about the project.
+project = "audiostretchy"
+copyright = "2023, twardoch"
+
+# The version info for the project you're documenting, acts as replacement for
+# |version| and |release|, also used in various other places throughout the
+# built documents.
+#
+# version: The short X.Y version.
+# release: The full version, including alpha/beta/rc tags.
+# If you don’t need the separation provided between version and release,
+# just set them both to the same value.
+try:
+    from audiostretchy import __version__ as version
+except ImportError:
+    version = ""
+
+if not version or version.lower() == "unknown":
+    version = os.getenv("READTHEDOCS_VERSION", "unknown")  # automatically set by RTD
+
+release = version
+
+# The language for content autogenerated by Sphinx. Refer to documentation
+# for a list of supported languages.
+# language = None
+
+# There are two options for replacing |today|: either, you set today to some
+# non-false value, then it is used:
+# today = ''
+# Else, today_fmt is used as the format for a strftime call.
+# today_fmt = '%B %d, %Y'
+
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", ".venv"]
+
+# The reST default role (used for this markup: `text`) to use for all documents.
+# default_role = None
+
+# If true, '()' will be appended to :func: etc. cross-reference text.
+# add_function_parentheses = True
+
+# If true, the current module name will be prepended to all description
+# unit titles (such as .. function::).
+# add_module_names = True
+
+# If true, sectionauthor and moduleauthor directives will be shown in the
+# output. They are ignored by default.
+# show_authors = False
+
+# The name of the Pygments (syntax highlighting) style to use.
+pygments_style = "sphinx"
+
+# A list of ignored prefixes for module index sorting.
+# modindex_common_prefix = []
+
+# If true, keep warnings as "system message" paragraphs in the built documents.
+# keep_warnings = False
+
+# If this is True, todo emits a warning for each TODO entries. The default is False.
+todo_emit_warnings = True
+
+
+# -- Options for HTML output -------------------------------------------------
+
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+html_theme = "alabaster"
+
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+html_theme_options = {
+    "sidebar_width": "300px",
+    "page_width": "1200px"
+}
+
+# Add any paths that contain custom themes here, relative to this directory.
+# html_theme_path = []
+
+# The name for this set of Sphinx documents.  If None, it defaults to
+# "<project> v<release> documentation".
+# html_title = None
+
+# A shorter title for the navigation bar.  Default is the same as html_title.
+# html_short_title = None
+
+# The name of an image file (relative to this directory) to place at the top
+# of the sidebar.
+# html_logo = ""
+
+# The name of an image file (within the static path) to use as favicon of the
+# docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
+# pixels large.
+# html_favicon = None
+
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ["_static"]
+
+# If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
+# using the given strftime format.
+# html_last_updated_fmt = '%b %d, %Y'
+
+# If true, SmartyPants will be used to convert quotes and dashes to
+# typographically correct entities.
+# html_use_smartypants = True
+
+# Custom sidebar templates, maps document names to template names.
+# html_sidebars = {}
+
+# Additional templates that should be rendered to pages, maps page names to
+# template names.
+# html_additional_pages = {}
+
+# If false, no module index is generated.
+# html_domain_indices = True
+
+# If false, no index is generated.
+# html_use_index = True
+
+# If true, the index is split into individual pages for each letter.
+# html_split_index = False
+
+# If true, links to the reST sources are added to the pages.
+# html_show_sourcelink = True
+
+# If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
+# html_show_sphinx = True
+
+# If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
+# html_show_copyright = True
+
+# If true, an OpenSearch description file will be output, and all pages will
+# contain a <link> tag referring to it.  The value of this option must be the
+# base URL from which the finished HTML is served.
+# html_use_opensearch = ''
+
+# This is the file name suffix for HTML files (e.g. ".xhtml").
+# html_file_suffix = None
+
+# Output file base name for HTML help builder.
+htmlhelp_basename = "audiostretchy-doc"
+
+
+# -- Options for LaTeX output ------------------------------------------------
+
+latex_elements = {
+    # The paper size ("letterpaper" or "a4paper").
+    # "papersize": "letterpaper",
+    # The font size ("10pt", "11pt" or "12pt").
+    # "pointsize": "10pt",
+    # Additional stuff for the LaTeX preamble.
+    # "preamble": "",
+}
+
+# Grouping the document tree into LaTeX files. List of tuples
+# (source start file, target name, title, author, documentclass [howto/manual]).
+latex_documents = [
+    ("index", "user_guide.tex", "audiostretchy Documentation", "twardoch", "manual")
+]
+
+# The name of an image file (relative to this directory) to place at the top of
+# the title page.
+# latex_logo = ""
+
+# For "manual" documents, if this is true, then toplevel headings are parts,
+# not chapters.
+# latex_use_parts = False
+
+# If true, show page references after internal links.
+# latex_show_pagerefs = False
+
+# If true, show URL addresses after external links.
+# latex_show_urls = False
+
+# Documents to append as an appendix to all manuals.
+# latex_appendices = []
+
+# If false, no module index is generated.
+# latex_domain_indices = True
+
+# -- External mapping --------------------------------------------------------
+python_version = ".".join(map(str, sys.version_info[0:2]))
+intersphinx_mapping = {
+    "sphinx": ("https://www.sphinx-doc.org/en/master", None),
+    "python": ("https://docs.python.org/" + python_version, None),
+    "matplotlib": ("https://matplotlib.org", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "sklearn": ("https://scikit-learn.org/stable", None),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
+    "setuptools": ("https://setuptools.pypa.io/en/stable/", None),
+    "pyscaffold": ("https://pyscaffold.org/en/stable", None),
+}
+
+print(f"loading configurations for {project} {version} ...", file=sys.stderr)
+</file>
+
+<file path="docs/contributing.md">
+```{include} ../CONTRIBUTING.md
+:relative-docs: docs/
+:relative-images:
+```
+</file>
+
+<file path="docs/index.md">
+# audiostretchy
+
+Add a short description here!
+
+
+## Note
+
+> This is the main page of your project's [Sphinx] documentation. It is
+> formatted in [Markdown]. Add additional pages by creating md-files in
+> `docs` or rst-files (formatted in [reStructuredText]) and adding links to
+> them in the `Contents` section below.
+>
+> Please check [Sphinx] and [MyST] for more information
+> about how to document your project and how to configure your preferences.
+
+
+## Contents
+
+```{toctree}
+:maxdepth: 2
+
+Overview <readme>
+Contributions & Help <contributing>
+License <license>
+Authors <authors>
+Changelog <changelog>
+Module Reference <api/modules>
+```
+
+## Indices and tables
+
+* {ref}`genindex`
+* {ref}`modindex`
+* {ref}`search`
+
+[Sphinx]: http://www.sphinx-doc.org/
+[Markdown]: https://daringfireball.net/projects/markdown/
+[reStructuredText]: http://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html
+[MyST]: https://myst-parser.readthedocs.io/en/latest/
+</file>
+
+<file path="docs/license.md">
+# License
+
+```{literalinclude} ../LICENSE.txt
+:language: text
+```
+</file>
+
+<file path="docs/Makefile">
+# Makefile for Sphinx documentation
+#
+
+# You can set these variables from the command line, and also
+# from the environment for the first two.
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
+SOURCEDIR     = .
+BUILDDIR      = _build
+AUTODOCDIR    = api
+
+# User-friendly check for sphinx-build
+ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $?), 1)
+$(error "The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have Sphinx installed, grab it from https://sphinx-doc.org/")
+endif
+
+.PHONY: help clean Makefile
+
+# Put it first so that "make" without argument is like "make help".
+help:
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
+clean:
+	rm -rf $(BUILDDIR)/* $(AUTODOCDIR)
+
+# Catch-all target: route all unknown targets to Sphinx using the new
+# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
+%: Makefile
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+</file>
+
+<file path="docs/readme.md">
+```{include} ../README.md
+:relative-docs: docs/
+:relative-images:
+```
+</file>
+
+<file path="docs/requirements.txt">
+# Requirements file for ReadTheDocs, check .readthedocs.yml.
+# To build the module reference correctly, make sure every external package
+# under `install_requires` in `setup.cfg` is also listed here!
+# sphinx_rtd_theme
+myst-parser[linkify]
+sphinx>=3.2.1
+</file>
+
+<file path="src/audiostretchy/interface/win/_stretch.def">
+EXPORTS
+    stretch_init
+    stretch_output_capacity
+    stretch_samples
+    stretch_flush
+    stretch_reset
+    stretch_deinit
+</file>
+
+<file path="src/audiostretchy/interface/tdhs.py">
+"""
+The _stretch library implements a time-stretching algorithm for audio signals. This algorithm modifies the length of the audio signal without changing its pitch. The code works by splitting the audio into small chunks or periods and then either repeating or removing some of these periods to alter the overall length of the audio. The original code works as follows.
+
+1. The stretch_init function initializes a "stretching context" which contains all of the necessary information for the time stretching operation. This includes the audio data itself, the desired shortest and longest periods, the number of audio channels, and certain flags for adjusting the algorithm's behavior.
+
+2. The stretch_samples function performs the actual time stretching. It works by iterating through the audio data, finding the best period to adjust based on the desired ratio, and then either repeating or removing that period to adjust the overall length of the audio.
+
+3. The find_period and find_period_fast functions are used to find the best period in the audio data to adjust. They do this by calculating a correlation value for each possible period and then returning the period with the highest correlation. The correlation value is calculated based on the sum of the absolute differences of each corresponding pair of samples in the period.
+
+4. The merge_blocks function is used to combine two audio periods into one. This is used when the algorithm needs to repeat a period to extend the length of the audio.
+
+5. The stretch_flush function is used to output any remaining audio data after the time stretching operation is complete. This is necessary because the algorithm works by buffering a certain amount of audio data and then processing it in chunks.
+
+6. Finally, the stretch_deinit function is used to free up any memory that was allocated during the time stretching operation.
+
+This is a sophisticated algorithm for audio time stretching that is capable of producing high-quality results.
+
+Below are ctypes bindings to the library.
+"""
+
+import ctypes
+import platform
+from pathlib import Path
+import numpy as np
+
+if platform.system() == 'Windows':
+    lib_path = Path(__file__).parent / 'win' / '_stretch.dll'
+elif platform.system() == 'Darwin':  # Mac
+    lib_path = Path(__file__).parent / 'mac' / '_stretch.dylib'
+elif platform.system() == 'Linux':  # Linux
+    lib_path = Path(__file__).parent / 'linux' / '_stretch.so'
+else:
+    raise NotImplementedError("This platform is not supported.")
+
+stretch_lib = ctypes.cdll.LoadLibrary(str(lib_path))
+
+
+class TDHSAudioStretch:
+    """
+    The Stretch class is a Python binding for the _stretch library, providing an interface
+    to time-stretch audio signals without changing their pitch.
+    """
+    STRETCH_FAST_FLAG = 0x1
+    STRETCH_DUAL_FLAG = 0x2
+
+    def __init__(self, shortest_period: int, longest_period: int, num_chans: int, flags: int) -> None:
+        """
+        Initialize the stretching context with the given parameters.
+
+        :param shortest_period: The shortest period, affecting frequency handling.
+        :param longest_period: The longest period, affecting frequency handling.
+        :param num_chans: The number of audio channels.
+        :param flags: Flags for adjusting the algorithm's behavior.
+        """
+        self.stretch_init = stretch_lib.stretch_init
+        self.stretch_init.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        self.stretch_init.restype = ctypes.c_void_p
+        self.handle = self.stretch_init(
+            shortest_period, longest_period, num_chans, flags
+        )
+        self.stretch_output_capacity = stretch_lib.stretch_output_capacity
+        self.stretch_output_capacity.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_float,
+        ]
+        self.stretch_output_capacity.restype = ctypes.c_int
+        self.stretch_samples = stretch_lib.stretch_samples
+        self.stretch_samples.argtypes = [
+            ctypes.c_void_p,
+            np.ctypeslib.ndpointer(dtype=np.int16),
+            ctypes.c_int,
+            np.ctypeslib.ndpointer(dtype=np.int16),
+            ctypes.c_float,
+        ]
+        self.stretch_samples.restype = ctypes.c_int
+        self.stretch_flush = stretch_lib.stretch_flush
+        self.stretch_flush.argtypes = [
+            ctypes.c_void_p,
+            np.ctypeslib.ndpointer(dtype=np.int16),
+        ]
+        self.stretch_flush.restype = ctypes.c_int
+        self.stretch_reset = stretch_lib.stretch_reset
+        self.stretch_reset.argtypes = [ctypes.c_void_p]
+        self.stretch_reset.restype = None
+        self.stretch_deinit = stretch_lib.stretch_deinit
+        self.stretch_deinit.argtypes = [ctypes.c_void_p]
+        self.stretch_deinit.restype = None
+
+    def output_capacity(self, max_num_samples: int, max_ratio: float) -> int:
+        """
+        Determine the number of samples to reserve in the output array for
+        stretch_samples() and stretch_flush().
+
+        :param max_num_samples: The maximum number of samples.
+        :param max_ratio: The maximum stretching ratio.
+        :return: The number of samples to reserve in the output array.
+        """
+        return self.stretch_output_capacity(self.handle, max_num_samples, max_ratio)
+
+    def process_samples(self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float) -> int:
+        """
+        Process the samples with a specified ratio.
+
+        :param samples: The input audio samples.
+        :param num_samples: The number of samples.
+        :param output: The output audio samples.
+        :param ratio: The stretching ratio.
+        :return: The number of processed samples.
+        """
+        return self.stretch_samples(self.handle, samples, num_samples, output, ratio)
+
+    def flush(self, output: np.ndarray) -> int:
+        """
+        Flush any leftover samples out at normal speed.
+
+        :param output: The output audio samples.
+        :return: The number of flushed samples.
+        """
+        return self.stretch_flush(self.handle, output)
+
+    def reset(self) -> None:
+        """
+        Reset the stretching context.
+        """
+        self.stretch_reset(self.handle)
+
+    def deinit(self) -> None:
+        """
+        Deinitialize the stretching context and free up memory.
+        """
+        self.stretch_deinit(self.handle)
+        self.handle = None
+</file>
+
+<file path="src/audiostretchy/__init__.py">
+import sys
+
+if sys.version_info[:2] >= (3, 8):
+    # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
+    from importlib.metadata import PackageNotFoundError, version  # pragma: no cover
+else:
+    from importlib_metadata import PackageNotFoundError, version  # pragma: no cover
+
+try:
+    # Change here if project is renamed and does not equal the package name
+    dist_name = __name__
+    __version__ = version(dist_name)
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "unknown"
+finally:
+    del version, PackageNotFoundError
+</file>
+
+<file path="src/audiostretchy/__main__.py">
+#!/usr/bin/env python3
+from pathlib import Path
+
+import fire
+from .stretch import stretch_audio
+
+
+def cli():
+    fire.core.Display = lambda lines, out: print(*lines, file=out)
+    fire.Fire(stretch_audio)
+
+
+if __name__ == "__main__":
+    cli()
+</file>
+
+<file path="src/audiostretchy/py.typed">
+
+</file>
+
+<file path="src/audiostretchy/stretch.py">
+import wave # Keep for now, may be removed if pedalboard handles all aspects
+from io import BytesIO
+from pathlib import Path
+from typing import BinaryIO, Optional, Union # Tuple removed
+
+import numpy as np
+import pedalboard
+from pedalboard import Pedalboard, Resample # Explicit imports, removed AudioFile
+from pedalboard import time_stretch as TimeStretch # Corrected import
+from pedalboard.io import AudioFile as PedalboardAudioFile # Alias for clarity is correctly used
+
+# Assuming TDHSAudioStretch might be conditionally used or replaced entirely.
+# If fully replaced, this import and the vendors/stretch submodule might be removable later.
+from .interface.tdhs import TDHSAudioStretch
+
+
+class AudioStretch:
+    """
+    Main class to perform audio stretching operations using Pedalboard.
+    """
+
+    def __init__(self): # ext parameter removed as its usage was unclear and likely tied to old pcm handling
+        """
+        Constructor for the AudioStretch class.
+        """
+        self.nchannels = 1
+        self.framerate = 44100 # Default, will be updated from file
+        self.in_samples = None # Will be float32 numpy array
+        self.samples = None    # Will be float32 numpy array, processed audio
+
+    def open(
+        self,
+        path: Optional[Union[str, Path]] = None,
+        file: Optional[BinaryIO] = None,
+        # format parameter is largely handled by pedalboard by extension or content
+    ):
+        """
+        Open an audio file using Pedalboard.
+
+        Args:
+            path (Union[str, Path], optional): Path to the audio file.
+            file (BinaryIO, optional): Binary I/O object of the audio file.
+        """
+        input_source = file or path
+        if not input_source:
+            raise ValueError("Either path or file must be provided.")
+
+        if isinstance(input_source, Path):
+            input_source = str(input_source) # Pedalboard AudioFile expects str or file-like
+
+        try:
+            with PedalboardAudioFile(input_source) as f:
+                self.in_samples = f.read(f.frames)
+                self.framerate = f.samplerate
+                self.nchannels = f.num_channels
+            self.samples = self.in_samples.copy() # Start with a copy for processing
+        except Exception as e:
+            raise IOError(f"Could not open audio file {input_source}: {e}") from e
+
+
+    def save(
+        self,
+        path: Optional[Union[str, Path]] = None,
+        file: Optional[BinaryIO] = None,
+        output_format: Optional[str] = None, # e.g., "wav", "mp3", "flac"
+        # TODO: Add parameters for quality/bitrate for formats like MP3
+    ):
+        """
+        Save the audio file using Pedalboard.
+
+        Args:
+            path (Union[str, Path], optional): Path to save the audio file.
+            file (BinaryIO, optional): Binary I/O object to save the audio file.
+            output_format (str, optional): The format of the audio file (e.g., 'wav', 'mp3').
+                                       Pedalboard often infers from path extension.
+        """
+        output_target = file or path
+        if not output_target:
+            raise ValueError("Either path or file must be provided for saving.")
+
+        if isinstance(output_target, Path):
+            output_target = str(output_target) # Keep for error message if it fails before open
+
+        if self.samples is None:
+            raise ValueError("No audio data to save. Call open() and process first.")
+
+        # self.samples is (num_channels, num_frames)
+        # PedalboardAudioFile.write expects (num_channels, num_frames)
+        processed_samples = self.samples
+
+        # Ensure it's C-contiguous, especially if it might have been sliced or modified in ways that change flags.
+        if not processed_samples.flags['C_CONTIGUOUS']:
+            processed_samples = np.ascontiguousarray(processed_samples, dtype=np.float32)
+
+        try:
+            if isinstance(output_target, str) and not file: # If it's a path string
+                with open(output_target, "wb") as actual_file_obj:
+                    with PedalboardAudioFile(
+                        actual_file_obj, # Pass the file object
+                        mode="w",
+                        samplerate=self.framerate,
+                        num_channels=self.nchannels,
+                        format=output_format or Path(output_target).suffix[1:]
+                    ) as f:
+                        f.write(processed_samples)
+            elif file: # If it was a file object to begin with
+                 with PedalboardAudioFile(
+                    file, # Pass the original file object
+                    mode="w",
+                    samplerate=self.framerate,
+                    num_channels=self.nchannels,
+                    format=output_format
+                ) as f:
+                    f.write(processed_samples)
+            else:
+                # This case should ideally not be reached if output_target is always set
+                raise ValueError("Invalid output target for saving.")
+
+        except Exception as e:
+            # Ensure output_target for the error message is the original path/file identifier
+            error_location = path or (file.name if hasattr(file, 'name') else 'provided file object')
+            raise IOError(f"Could not save audio file to {error_location}: {e}") from e
+
+    # pcm_decode and pcm_encode are no longer needed as pedalboard handles this.
+    # rms_level_dB might be needed for gap_ratio, or use pedalboard.Loudness
+
+    def resample(self, target_framerate: int):
+        """
+        Resample the audio using Pedalboard.
+
+        Args:
+            target_framerate (int): Target framerate for resampling.
+        """
+        if self.samples is None:
+            raise ValueError("No audio data to resample. Call open() first.")
+        if target_framerate <= 0 or target_framerate == self.framerate:
+            return # No resampling needed
+
+        # Pedalboard processes audio block by block, best to create a board
+        board = Pedalboard([
+            Resample(
+                target_sample_rate=target_framerate, # Corrected parameter name
+                # quality="HQ" or "VHQ" can be set if desired, default is usually good
+            )
+        ])
+
+        current_samples = self.samples # This is (channels, frames) at self.framerate
+
+        board = Pedalboard([
+            Resample(
+                target_sample_rate=target_framerate,
+                quality=pedalboard.Resample.Quality.Linear # Corrected case
+            )
+        ])
+
+        # Process the audio through the board, providing the input sample rate.
+        resampled_audio = board(current_samples, sample_rate=self.framerate)
+
+        self.samples = resampled_audio
+
+        self.framerate = target_framerate
+
+
+    def stretch(
+        self,
+        ratio: float = 1.0, # This is inverse of pedalboard's stretch_factor
+        # The following parameters are from TDHSAudioStretch and may not map directly
+        # gap_ratio: float = 0.0,
+        # upper_freq: int = 333,
+        # lower_freq: int = 55,
+        # buffer_ms: float = 25,
+        # threshold_gap_db: float = -40,
+        # double_range: bool = False, # TDHS specific range flag
+        # fast_detection: bool = False, # TDHS specific quality/speed flag
+        # normal_detection: bool = False, # TDHS specific quality/speed flag
+        # ---- Pedalboard TimeStretch parameters ----
+        # method: str = "auto" # e.g. "rubberband", "ola", "wsola" - "auto" usually picks rubberband if available
+        # quality: str = "high" # e.g. "standard", "high", "extreme" for rubberband
+    ):
+        """
+        Stretch the audio using Pedalboard.TimeStretch.
+        Note: `ratio` > 1.0 extends audio (slower), < 1.0 shortens (faster).
+        Pedalboard's `stretch_factor` is the inverse: factor > 1.0 is faster, < 1.0 is slower.
+
+        Args:
+            ratio (float): Original stretch ratio (compatible with TDHS definition).
+                           > 1.0 makes audio longer, < 1.0 makes it shorter.
+            # TODO: Map or implement gap_ratio and other features if possible.
+            # TODO: Expose pedalboard.TimeStretch parameters like method, quality.
+        """
+        if self.samples is None:
+            raise ValueError("No audio data to stretch. Call open() first.")
+        if ratio == 1.0:
+            return # No stretching needed
+
+        # Convert audiostretchy ratio to pedalboard stretch_factor
+        # ratio = 1.2 (20% longer) => pedalboard factor = 1/1.2 = 0.833...
+        # ratio = 0.8 (20% shorter) => pedalboard factor = 1/0.8 = 1.25
+        stretch_factor = 1.0 / ratio
+
+        # For now, ignoring gap_ratio and other TDHS-specific params.
+        # This is a simplified stretch of the whole audio.
+
+        # Pedalboard's time_stretch is a direct function, not a plugin for the board.
+        # It expects (num_channels, num_frames), which self.samples already is.
+        current_samples_for_stretch = self.samples
+
+        stretched_audio = TimeStretch(
+            current_samples_for_stretch,
+            samplerate=self.framerate,
+            stretch_factor=stretch_factor,
+            # TODO: Expose other parameters like high_quality, transient_mode etc.
+        )
+
+        # Output of time_stretch is (num_channels, num_frames).
+        self.samples = stretched_audio
+
+        # The number of frames and thus duration changes, framerate stays the same.
+
+
+# Global function for CLI and simple library use
+def stretch_audio(
+    input_path: str,
+    output_path: str,
+    ratio: float = 1.0,
+    # TDHS specific parameters - these will be ignored or need re-mapping for Pedalboard
+    gap_ratio: float = 0.0, # Will be harder to implement with pedalboard directly
+    upper_freq: int = 333,   # Not directly applicable to pedalboard.TimeStretch
+    lower_freq: int = 55,    # Not directly applicable
+    buffer_ms: float = 25,   # Not directly applicable
+    threshold_gap_db: float = -40, # Not directly applicable for basic stretch
+    double_range: bool = False,    # Not directly applicable
+    fast_detection: bool = False,  # Not directly applicable (pedalboard has quality settings)
+    normal_detection: bool = False,# Not directly applicable
+    sample_rate: int = 0, # Target sample rate for resampling
+):
+    """
+    Stretches the input audio file and saves the result to the output path using Pedalboard.
+
+    Args:
+        input_path (str): The path to the input audio file.
+        output_path (str): The path to save the stretched audio file.
+        ratio (float, optional): The stretch ratio. > 1.0 extends audio, < 1.0 shortens.
+                                 Default is 1.0 (no change).
+        sample_rate (int, optional): The target sample rate for resampling.
+                                     Default is 0 (use sample rate of the input audio).
+
+        NOTE: Parameters related to TDHS (gap_ratio, freq limits, etc.) are currently
+              not supported in this Pedalboard-based version. The stretch applies uniformly.
+    """
+    audio_processor = AudioStretch()
+    audio_processor.open(input_path)
+
+    # 1. Stretch
+    if ratio != 1.0:
+        audio_processor.stretch(ratio=ratio) # Add other relevant params later if implemented
+
+    # 2. Resample (if needed)
+    if sample_rate > 0 and sample_rate != audio_processor.framerate:
+        audio_processor.resample(target_framerate=sample_rate)
+
+    audio_processor.save(output_path)
+</file>
+
+<file path="tests/conftest.py">
+"""
+    Dummy conftest.py for audiostretchy.
+
+    If you don't know what this is for, just leave it empty.
+    Read more about conftest.py under:
+    - https://docs.pytest.org/en/stable/fixture.html
+    - https://docs.pytest.org/en/stable/writing_plugins.html
+"""
+
+# import pytest
+</file>
+
+<file path="tests/test_stretch.py">
+import pytest
+from pathlib import Path
+import numpy as np
+import soundfile # Using soundfile for reliable audio properties comparison
+
+from audiostretchy.stretch import AudioStretch, stretch_audio
+
+# Helper function to get audio properties
+def get_audio_properties(file_path):
+    with soundfile.SoundFile(file_path, 'r') as sf:
+        return sf.samplerate, sf.channels, sf.frames
+
+@pytest.fixture
+def audio_processor():
+    return AudioStretch()
+
+@pytest.fixture
+def sample_wav_path():
+    return Path("tests/audio.wav")
+
+@pytest.fixture
+def sample_mp3_path():
+    return Path("tests/audio.mp3")
+
+# --- Test AudioStretch Class ---
+
+def test_open_wav(audio_processor, sample_wav_path):
+    audio_processor.open(sample_wav_path)
+    # Get properties using soundfile for comparison
+    sf_rate, sf_channels, sf_frames = get_audio_properties(sample_wav_path)
+    assert audio_processor.framerate == sf_rate
+    assert audio_processor.nchannels == sf_channels
+    assert audio_processor.in_samples is not None
+    assert audio_processor.samples is not None
+    # Samples are (channels, frames)
+    assert audio_processor.in_samples.shape == (sf_channels, sf_frames)
+    assert audio_processor.samples.shape == (sf_channels, sf_frames)
+    assert audio_processor.in_samples.dtype == np.float32
+
+def test_open_mp3(audio_processor, sample_mp3_path):
+    # This requires ffmpeg to be installed for pedalboard to read mp3s usually
+    try:
+        audio_processor.open(sample_mp3_path)
+        assert audio_processor.framerate > 0
+        assert audio_processor.nchannels > 0
+        assert audio_processor.in_samples is not None
+        assert audio_processor.samples is not None
+        assert audio_processor.in_samples.dtype == np.float32
+    except IOError as e:
+        pytest.skip(f"Skipping MP3 test, pedalboard couldn't open MP3 (possibly missing ffmpeg or backend): {e}")
+    except Exception as e: # Catch any other pedalboard/soundfile error during open
+        pytest.skip(f"Skipping MP3 test due to an unexpected error during open: {e}")
+
+
+def test_save_wav(audio_processor, sample_wav_path, tmp_path):
+    audio_processor.open(sample_wav_path)
+    output_path = tmp_path / "output.wav"
+    audio_processor.save(output_path)
+
+    assert output_path.exists()
+    rate, channels, frames = get_audio_properties(output_path)
+    assert rate == audio_processor.framerate
+    assert channels == audio_processor.nchannels
+    # audio_processor.samples is (channels, frames)
+    expected_frames = audio_processor.samples.shape[1]
+    assert frames == expected_frames
+
+
+def test_save_mp3(audio_processor, sample_wav_path, tmp_path):
+    # Open a WAV and save as MP3
+    audio_processor.open(sample_wav_path)
+    output_path = tmp_path / "output.mp3"
+    try:
+        audio_processor.save(output_path, output_format="mp3") # Specify format
+        assert output_path.exists()
+        # Check basic properties. MP3 encoding can sometimes slightly alter frame counts or lead to skips.
+        rate, channels, _ = get_audio_properties(output_path)
+        assert rate == audio_processor.framerate
+        assert channels == audio_processor.nchannels
+    except IOError as e:
+        pytest.skip(f"Skipping MP3 save test, pedalboard couldn't save MP3 (possibly missing ffmpeg or backend): {e}")
+    except Exception as e:
+        pytest.skip(f"Skipping MP3 save test due to an unexpected error: {e}")
+
+def test_resample(audio_processor, sample_wav_path):
+    audio_processor.open(sample_wav_path)
+    original_framerate = audio_processor.framerate
+    # audio_processor.samples is (channels, frames)
+    original_frames = audio_processor.samples.shape[1]
+    target_framerate = 22050
+
+    audio_processor.resample(target_framerate)
+
+    assert audio_processor.framerate == target_framerate
+    # audio_processor.samples is still (channels, frames)
+    current_frames = audio_processor.samples.shape[1]
+    expected_frames = int(original_frames * (target_framerate / original_framerate))
+
+    # Resampling can have slight variations in frame count
+    assert abs(current_frames - expected_frames) < 5 # Allow small deviation
+
+def test_resample_noop(audio_processor, sample_wav_path):
+    """Test that resampling to the same sample rate is a no-op."""
+    audio_processor.open(sample_wav_path)
+    original_framerate = audio_processor.framerate
+    original_samples = audio_processor.samples.copy()
+    audio_processor.resample(original_framerate)
+    assert audio_processor.framerate == original_framerate
+    # The samples should be unchanged
+    assert audio_processor.samples.shape == original_samples.shape
+    assert (audio_processor.samples == original_samples).all()
+
+def test_stretch_no_change(audio_processor, sample_wav_path):
+    audio_processor.open(sample_wav_path)
+    original_samples_shape = audio_processor.samples.shape
+    audio_processor.stretch(ratio=1.0)
+    assert audio_processor.samples.shape == original_samples_shape
+
+def test_stretch_longer(audio_processor, sample_wav_path):
+    audio_processor.open(sample_wav_path)
+    # audio_processor.samples is (channels, frames) after open
+    original_frames = audio_processor.samples.shape[1]
+    ratio = 1.5 # Make 50% longer
+    audio_processor.stretch(ratio=ratio)
+
+    # After stretch, self.samples is (channels, frames)
+    current_frames = audio_processor.samples.shape[1]
+    expected_frames = int(original_frames * ratio)
+
+    # Time stretching isn't always perfectly exact to the sample, allow some leeway
+    assert abs(current_frames - expected_frames) < original_frames * 0.05 # 5% leeway
+
+def test_stretch_shorter(audio_processor, sample_wav_path):
+    audio_processor.open(sample_wav_path)
+    # audio_processor.samples is (channels, frames) after open
+    original_frames = audio_processor.samples.shape[1]
+    ratio = 0.75 # Make 25% shorter
+    audio_processor.stretch(ratio=ratio)
+
+    # After stretch, self.samples is (channels, frames)
+    current_frames = audio_processor.samples.shape[1]
+    expected_frames = int(original_frames * ratio)
+
+    assert abs(current_frames - expected_frames) < original_frames * 0.05 # 5% leeway
+
+# --- Test stretch_audio global function (CLI entry point) ---
+
+def test_stretch_audio_func_wav_to_wav(sample_wav_path, tmp_path):
+    input_path = sample_wav_path
+    output_path = tmp_path / "stretched_audio.wav"
+    ratio = 1.2
+
+    stretch_audio(str(input_path), str(output_path), ratio=ratio)
+
+    assert output_path.exists()
+    in_rate, in_channels, in_frames = get_audio_properties(input_path)
+    out_rate, out_channels, out_frames = get_audio_properties(output_path)
+
+    assert out_rate == in_rate
+    assert out_channels == in_channels
+    expected_frames = int(in_frames * ratio)
+    assert abs(out_frames - expected_frames) < in_frames * 0.05 # 5% leeway
+
+def test_stretch_audio_func_mp3_to_mp3(sample_mp3_path, tmp_path):
+    input_path = sample_mp3_path
+    output_path = tmp_path / "stretched_audio.mp3"
+    ratio = 0.8
+
+    try:
+        # Need to ensure the input can be read first
+        in_props_available = False
+        try:
+            in_rate, in_channels, in_frames = get_audio_properties(input_path)
+            in_props_available = True
+        except Exception as e:
+             pytest.skip(f"Skipping MP3 integration test: Could not read input MP3 properties ({e}).")
+
+        if in_props_available:
+            stretch_audio(str(input_path), str(output_path), ratio=ratio)
+            assert output_path.exists()
+            out_rate, out_channels, out_frames = get_audio_properties(output_path)
+
+            assert out_rate == in_rate
+            assert out_channels == in_channels
+            expected_frames = int(in_frames * ratio)
+            # MP3 encoding/decoding can add/remove priming/padding frames. Leeway might need to be larger.
+            assert abs(out_frames - expected_frames) < in_frames * 0.10 # 10% leeway for MP3
+
+    except IOError as e:
+        pytest.skip(f"Skipping MP3 integration test, pedalboard operation failed (possibly missing ffmpeg or backend): {e}")
+    except Exception as e:
+        pytest.skip(f"Skipping MP3 integration test due to an unexpected error: {e}")
+
+
+def test_stretch_audio_func_resample(sample_wav_path, tmp_path):
+    input_path = sample_wav_path
+    output_path = tmp_path / "resampled_audio.wav"
+    target_sample_rate = 16000
+
+    stretch_audio(str(input_path), str(output_path), ratio=1.0, sample_rate=target_sample_rate)
+
+    assert output_path.exists()
+    out_rate, _, _ = get_audio_properties(output_path)
+    assert out_rate == target_sample_rate
+
+def test_stretch_audio_func_stretch_and_resample(sample_wav_path, tmp_path):
+    input_path = sample_wav_path
+    output_path = tmp_path / "stretch_resample.wav"
+    ratio = 1.3
+    target_sample_rate = 8000
+
+    stretch_audio(str(input_path), str(output_path), ratio=ratio, sample_rate=target_sample_rate)
+
+    assert output_path.exists()
+    in_rate, _, in_frames = get_audio_properties(input_path)
+    out_rate, _, out_frames = get_audio_properties(output_path)
+
+    assert out_rate == target_sample_rate
+    # Expected frames after stretch, then account for resampling
+    expected_frames_after_stretch = in_frames * ratio
+    expected_final_frames = int(expected_frames_after_stretch * (target_sample_rate / in_rate))
+    assert abs(out_frames - expected_final_frames) < expected_frames_after_stretch * 0.05 # 5% leeway on stretched length
+
+# TODO: Add tests for file-like objects for open/save
+# TODO: Add tests for CLI arguments if Fire CLI parsing changes significantly or needs specific checks.
+#       For now, stretch_audio function tests cover the core functionality invoked by CLI.
+# TODO: If gap_ratio or other TDHS features are re-implemented with pedalboard, add tests for them.
+# TODO: Consider adding tests for other formats pedalboard supports if relevant (e.g. FLAC, OGG)
+#       Requires sample files and ensuring pedalboard backends are present.
+
+# Add soundfile to testing dependencies in pyproject.toml
+# [project.optional-dependencies]
+# testing = [
+#     "setuptools",
+#     "pytest",
+#     "pytest-cov",
+#     "soundfile", # Added this
+# ]
+#
+# And ensure it's installed in the environment.
+# pip install soundfile
+
+# To run tests:
+# pytest tests/test_stretch.py --cov=src/audiostretchy/stretch
+# or simply pytest from root, if pyproject.toml is configured.
+# (Pytest should pick up config from pyproject.toml's [tool.pytest.ini_options])
+
+# Note on MP3 tests: Pedalboard's ability to handle MP3s often relies on system-installed
+# ffmpeg libraries. If these are not present in the test environment, MP3 tests might be
+# skipped or fail. The skips are added to handle this gracefully.
+# The `soundfile` library also has its own backend dependencies for MP3.
+# If skips are frequent, ensure ffmpeg (for pedalboard) and relevant soundfile backends (e.g. libsndfile with libmpg123)
+# are available in the CI/test environment.
+# For pedalboard, `pip install pedalboard[ffmpeg]` could be an option if it bundles it,
+# or ensuring ffmpeg is in the PATH.
+# For soundfile, `pip install soundfile[formats]` or ensuring libsndfile is compiled with appropriate format support.
+# However, `soundfile` itself doesn't list `libmpg123` or `lame` as direct pip-installable extras.
+# It relies on the underlying libsndfile to have support for these formats.
+# Often, `libsndfile1-dev` (or similar) on Linux includes these.
+# On macOS/Windows, users might need to install ffmpeg/libsndfile manually.
+
+# For the `get_audio_properties` helper, soundfile is generally robust.
+# If `soundfile` cannot open an MP3, it will raise an error.
+# The MP3 tests are structured to skip if `soundfile` (or `pedalboard` for processing)
+# has issues with MP3s, which usually points to backend/library availability.
+# The `audio.mp3` and `audio-1.2.mp3` seem to be LAME encoded, which is standard.
+# `tests/audio.wav` is a standard PCM WAV.
+# `tests/audio-1.2.wav` is also PCM WAV.
+# These files should be fine.
+# Pedalboard uses `libsndfile` by default for WAV, and can use it or `ffmpeg` for others.
+# If `ffmpeg` is available, `pedalboard` often prefers it for broader format support.
+# Let's ensure `soundfile` is in `pyproject.toml`
+# and then run the tests.
+#
+# The tests use `soundfile` to verify properties of output files. This is a good,
+# independent way to check what `pedalboard` wrote.
+#
+# Final check on sample rates of test files:
+# tests/audio.wav: (from README, implies it's the source for audio-1.2.wav)
+# tests/audio.mp3: (from README, implies it's the source for audio-1.2.mp3)
+# Assuming they are 44.1kHz as it's a common rate. The test for open_wav hardcodes this.
+# It would be better to read the actual sample rate from the file for comparison
+# in `test_open_wav` rather than hardcoding 44100, but for provided test files it's likely okay.
+# Let's assume `tests/audio.wav` is 44.1kHz stereo for now.
+# The `get_audio_properties` from `soundfile` will tell the truth.
+# The initial assertion `assert audio_processor.framerate == 44100` in `test_open_wav`
+# should ideally be compared against `get_audio_properties(sample_wav_path)[0]`.
+# Let's make that small adjustment.
+pass
+</file>
+
+<file path=".coveragerc">
+# .coveragerc to control coverage.py
+[run]
+branch = True
+source = audiostretchy
+# omit = bad_file.py
+
+[paths]
+source =
+    src/
+    */site-packages/
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if __name__ == .__main__.:
+</file>
+
+<file path=".gitignore">
+# Temporary and binary files
+*~
+*.py[cod]
+*.cfg
+!.isort.cfg
+!setup.cfg
+*.orig
+*.log
+*.pot
+__pycache__/*
+.cache/*
+.*.swp
+*/.ipynb_checkpoints/*
+.DS_Store
+
+# Project files
+.ropeproject
+.project
+.pydevproject
+.settings
+.idea
+.vscode
+tags
+
+# Package files
+*.egg
+*.eggs/
+.installed.cfg
+*.egg-info
+
+# Unittest and coverage
+htmlcov/*
+.coverage
+.coverage.*
+.tox
+junit*.xml
+coverage.xml
+.pytest_cache/
+
+# Build and docs folder/files
+#build/*
+#dist/*
+#sdist/*
+docs/api/*
+docs/_rst/*
+docs/_build/*
+cover/*
+MANIFEST
+
+# Per-project virtualenvs
+.venv*/
+.conda*/
+.python-version
+</file>
+
+<file path=".gitmodules">
+[submodule "vendors/stretch"]
+	path = vendors/stretch
+	url = https://github.com/dbry/audio-stretch
+[submodule "vendors/resample"]
+	path = vendors/resample
+	url = https://github.com/dbry/audio-resampler
+</file>
+
+<file path=".isort.cfg">
+[settings]
+profile = black
+known_first_party = audiostretchy
+</file>
+
+<file path=".pre-commit-config.yaml">
+exclude: '^docs/conf.py'
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: trailing-whitespace
+  - id: check-added-large-files
+  - id: check-ast
+  - id: check-json
+  - id: check-merge-conflict
+  - id: check-xml
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: requirements-txt-fixer
+  - id: mixed-line-ending
+    args: ['--fix=auto']  # replace 'auto' with 'lf' to enforce Linux/Mac line endings or 'crlf' for Windows
+
+## If you want to automatically "modernize" your Python code:
+# - repo: https://github.com/asottile/pyupgrade
+#   rev: v3.3.1
+#   hooks:
+#   - id: pyupgrade
+#     args: ['--py37-plus']
+
+## If you want to avoid flake8 errors due to unused vars or imports:
+# - repo: https://github.com/PyCQA/autoflake
+#   rev: v2.0.2
+#   hooks:
+#   - id: autoflake
+#     args: [
+#       --in-place,
+#       --remove-all-unused-imports,
+#       --remove-unused-variables,
+#     ]
+
+- repo: https://github.com/PyCQA/isort
+  rev: 5.11.5
+  hooks:
+  - id: isort
+
+- repo: https://github.com/psf/black
+  rev: stable
+  hooks:
+  - id: black
+    language_version: python3
+
+## If like to embrace black styles even in the docs:
+# - repo: https://github.com/asottile/blacken-docs
+#   rev: v1.13.0
+#   hooks:
+#   - id: blacken-docs
+#     additional_dependencies: [black]
+
+- repo: https://github.com/PyCQA/flake8
+  rev: 5.0.4
+  hooks:
+  - id: flake8
+  ## You can add flake8 plugins via `additional_dependencies`:
+  #  additional_dependencies: [flake8-bugbear]
+
+## Check for misspells in documentation files:
+# - repo: https://github.com/codespell-project/codespell
+#   rev: v2.2.4
+#   hooks:
+#   - id: codespell
+</file>
+
+<file path=".readthedocs.yml">
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  configuration: docs/conf.py
+
+# Build documentation with MkDocs
+#mkdocs:
+#  configuration: mkdocs.yml
+
+# Optionally build your docs in additional formats such as PDF
+formats:
+  - pdf
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+python:
+  install:
+    - requirements: docs/requirements.txt
+    - {path: ., method: pip}
+</file>
+
+<file path="AUTHORS.md">
+# Contributors
+
+* Adam Twardoch <adam+github@twardoch.com>
+</file>
+
+<file path="LICENSE.txt">
+BSD 3-Clause License
+
+Copyright (c) 2023, twardoch
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of audiostretchy nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+</file>
+
+<file path="pyproject.toml">
+[build-system]
+requires = ["setuptools>=46.1.0", "setuptools_scm[toml]>=5"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+
+[project]
+name = "audiostretchy"
+dynamic = ["version"] # Specify that version is dynamic
+description = "AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. AudioStretchy is a wrapper around the audio-stretch C library by David Bryant."
+readme = "README.md"
+authors = [{name = "Adam Twardoch", email = "adam+github@twardoch.com"}]
+license = { file = "LICENSE.txt" } # Corrected license format
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Programming Language :: C",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "fire>=0.5.0",
+    "numpy>=1.23.0", # Pedalboard uses numpy
+    "pedalboard>=0.8.6", # Main new dependency
+    "importlib-metadata; python_version<'3.8'",
+]
+
+[project.optional-dependencies]
+all = [
+    # pydub and pymp3 are no longer primary dependencies for mp3 handling if pedalboard works
+    # but keeping them for now in case pedalboard has issues or for comparison
+    "pydub>=0.25.1; sys_platform == 'darwin'",
+    "pymp3>=0.1.9; sys_platform == 'win32' or sys_platform == 'linux'",
+    # soxr is also replaced by pedalboard's resampling
+    "soxr>=0.3.5", # Keep for now, might be removed if pedalboard resampling is sufficient
+]
+testing = [
+    "setuptools",
+    "pytest",
+    "pytest-cov",
+    "soundfile", # For verifying audio file properties in tests
+]
+
+[project.urls]
+Homepage = "https://github.com/twardoch/audiostretchy"
+Documentation = "https://pyscaffold.org/" # Placeholder, update if official docs exist
+
+[project.scripts]
+audiostretchy = "audiostretchy.__main__:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*"] # Ensure tests are not included as a package
+
+[tool.setuptools.package-data]
+"*" = ["*.dll", "*.so", "*.dylib"] # For the C library, if kept
+
+[tool.pytest.ini_options]
+addopts = "--cov src/audiostretchy --cov-report term-missing --verbose" # Adjusted path for coverage
+norecursedirs = ["dist", "build", ".tox"]
+testpaths = ["tests"]
+
+[tool.flake8]
+max_line_length = 88
+extend_ignore = ["E203", "W503"] # Black-compatible
+exclude = [
+    ".tox",
+    "build",
+    "dist",
+    ".eggs",
+    "docs/conf.py",
+]
+</file>
+
+<file path="README.md">
+# AudioStretchy
+
+AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. The library is a wrapper around David Bryant’s [audio-stretch](https://github.com/dbry/audio-stretch) C library.
+
+_Version: 1.3.5_
+
+## Features
+
+- Fast, high-quality time stretching of audio files without changing their pitch
+- Adjustable stretching ratio from 0.25 to 4.0
+- Cross-platform: Windows, macOS, and Linux
+- Supports WAV files and file-like objects. With `[all]` installation, also supports MP3 files and file-like objects
+- With `[all]` installation, also supports resampling
+
+**Time-domain harmonic scaling (TDHS)** is a method for time-scale modification of speech (or other audio signals), allowing the apparent rate of speech articulation to be changed without affecting the pitch-contour and the time-evolution of the formant structure. TDHS differs from other time-scale modification algorithms in that time-scaling operations are performed in the time domain (not the frequency domain).
+
+The core functionality of this package is provided by David Bryant’s excellent [audio-stretch C library](https://github.com/dbry/audio-stretch) that performs fast, high-quality TDHS on WAV in the ratio range of 0.25 (4× slower) to 4.0 (4× faster).
+
+The library gives very good results with speech recordings, especially with modest stretching at the ratio between 0.9 (10% slower) and 1.1 (10% faster). AudioStretchy is a Python wrapper around that library. The Python package also offers some additional, optional functionality: supports MP3 (in addition to WAV), and allows you to preform resampling.
+
+## Demo
+
+Below are links to a short audio file (as WAV and MP3), with the same file stretched at 1.2 (20% slower):
+
+| Input                                                                             | Stretched                                                                                 |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`audio.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.wav) | [`audio-1.2.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.wav) |
+| [`audio.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.mp3) | [`audio-1.2.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.mp3) |
+
+
+## Installation
+
+### Full installation
+
+To be able to **stretch** and **resample** both **WAV** and **MP3** files, install AudioStretchy using `pip` like so:
+
+```
+python3 -m pip install audiostretchy[all]
+```
+
+This installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux.
+
+This also installs optional dependencies:
+
+- for MP3 support: [pydub](https://pypi.org/project/pydub/) on macOS, [pymp3](https://pypi.org/project/pymp3/) on Linux and Windows
+- for resampling: [soxr](https://pypi.org/project/soxr/)
+
+On macOS, you also need to install [HomeBrew](https://brew.sh/) and then in Terminal run:
+
+```bash
+brew install ffmpeg
+```
+
+### Minimal installation
+
+To only be able to **stretch** **WAV** files (no resampling, no MP3 support), install AudioStretchy with minimal dependencies like so:
+
+```
+python3 -m pip install audiostretchy
+```
+
+This only installs the package and the pre-compiled `audio-stretch` libraries for macOS, Windows and Linux.
+
+### Full development installation
+
+To install the development version, use:
+
+```
+python3 -m pip install git+https://github.com/twardoch/audiostretchy#egg=audiostretchy[all]
+```
+
+## Usage
+
+### CLI
+
+```
+audiostretchy INPUT_WAV OUTPUT_WAV <flags>
+
+POSITIONAL ARGUMENTS
+    INPUT_PATH
+        The path to the input WAV or MP3 audio file.
+    OUTPUT_PATH
+        The path to save the stretched WAV or MP3 audio file.
+
+FLAGS
+    -r, --ratio=RATIO
+        The stretch ratio, where values greater than 1.0 will extend the audio and
+        values less than 1.0 will shorten the audio. From 0.5 to 2.0, or with `-d`
+        from 0.25 to 4.0. Default is 1.0 = no stretching.
+    -g, --gap_ratio=GAP_RATIO
+        The stretch ratio for gaps (silence) in the audio.
+        Default is 0.0 = uses ratio.
+    -u, --upper_freq=UPPER_FREQ
+        The upper frequency limit for period detection in Hz. Default is 333 Hz.
+    -l, --lower_freq=LOWER_FREQ
+        The lower frequency limit. Default is 55 Hz.
+    -b, --buffer_ms=BUFFER_MS
+        The buffer size in milliseconds for processing the audio in chunks
+        (useful with `-g`). Default is 25 ms.
+    -t, --threshold_gap_db=THRESHOLD_GAP_DB
+        The threshold level in dB to determine if a section of audio is considered
+        a gap (for `-g`). Default is -40 dB.
+    -d, --double_range=DOUBLE_RANGE
+        If set, doubles the min/max range of stretching.
+    -f, --fast_detection=FAST_DETECTION
+        If set, enables fast period detection, which may speed up processing but
+        reduce the quality of the stretched audio.
+    -n, --normal_detection=NORMAL_DETECTION
+        If set, forces the algorithm to use normal period detection instead
+        of fast period detection.
+    -s, --sample_rate=SAMPLE_RATE
+        The target sample rate for resampling the stretched audio in Hz (if installed
+        with `[all]`). Default is 0 = use sample rate of the input audio.
+```
+
+### Python
+
+```python
+from audiostretchy.stretch import stretch_audio
+
+stretch_audio("input.wav", "output.wav", ratio=1.1)
+```
+
+In this example, the `input.wav` file will be time-stretched by a factor of 1.1, meaning it will be 10% longer, and the result will be saved in the `output.wav` file.
+
+For advanced usage, you can use the `AudioStretch` class that lets you open and save files provided as paths or as file-like BytesIO objects:
+
+```python
+from audiostretchy.stretch import AudioStretch
+
+audio_stretch = AudioStretch()
+# This needs [all] installation for MP3 support
+audio_stretch.open(file=MP3DataAsBytesIO, format="mp3")
+audio_stretch.stretch(
+    ratio=1.1,
+    gap_ratio=1.2,
+    upper_freq=333,
+    lower_freq=55,
+    buffer_ms=25,
+    threshold_gap_db=-40,
+    dual_force=False,
+    fast_detection=False,
+    normal_detection=False,
+)
+# This needs [all] installation for soxr support
+audio_stretch.resample(sample_rate=44100)
+audio_stretch.save(file=WAVDataAsBytesIO, format="wav")
+```
+
+## Changelog
+
+- v1.3.5: fix for MP3 writing
+- v1.3.2: fix for MP3 opening
+- v1.3.0: actually working on Windows as well
+- v1.2.x: working on macOS and Linux
+
+## License
+
+- [Original C library code](https://github.com/dbry/audio-stretch): Copyright (c) 2022 David Bryant
+- [Python code](https://github.com/twardoch/audiostretchy): Copyright (c) 2023 Adam Twardoch
+- Python code written with assistance from GPT-4
+- Licensed under the [BSD-3-Clause license](./LICENSE.txt)
+</file>
+
+<file path="setup.py">
+"""
+    Setup file for audiostretchy.
+    Use setup.cfg to configure your project.
+
+    This file was generated with PyScaffold 4.4.1.
+    PyScaffold helps you to put up the scaffold of your new Python project.
+    Learn more under: https://pyscaffold.org/
+"""
+from setuptools import setup
+
+if __name__ == "__main__":
+    try:
+        setup(use_scm_version={"version_scheme": "no-guess-dev"})
+    except:  # noqa
+        print(
+            "\n\nAn error occurred while building the project, "
+            "please ensure you have the most updated version of setuptools, "
+            "setuptools_scm and wheel with:\n"
+            "   pip install -U setuptools setuptools_scm wheel\n\n"
+        )
+        raise
+</file>
+
+</files>

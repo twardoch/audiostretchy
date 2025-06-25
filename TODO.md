@@ -1,0 +1,26 @@
+# AudioStretchy Streamlining TODO (Corrected)
+
+- [X] Revert Incorrect Changes to Restore C Library Focus
+    - [X] Restore key source files (`stretch.py`, `tdhs.py`, `.gitmodules`, `ci.yaml`, `pyproject.toml`, `README.md`, `test_stretch.py`)
+    - [X] Re-initialize submodules (`vendors/stretch`, `vendors/resample`)
+    - [X] Delete incorrect `PLAN.md`, `TODO.md`, `CHANGELOG.md`
+- [X] Integrate `pedalboard` for Audio I/O and Resampling
+    - [X] Modify `stretch.py` to use `pedalboard` for I/O and resampling.
+    - [X] Ensure `AudioStretch.stretch` converts data for C library and uses TDHS parameters.
+    - [X] Remove `pydub`, `pymp3`, `soxr` from `pyproject.toml`.
+- [X] Ensure Robust C Library Build and Packaging
+    - [X] Verify CI workflow for C library compilation.
+    - [X] Verify `pyproject.toml` for packaging compiled C libraries.
+- [X] Update Documentation (`README.md`, etc.)
+    - [X] Update `README.md` for corrected architecture, installation, API examples.
+- [X] Update Tests (`tests/test_stretch.py`)
+    - [X] Confirm tests align with C library stretching and `pedalboard` I/O.
+- [X] Re-create `PLAN.md`, `TODO.md`, and `CHANGELOG.md`
+    - [X] Create `PLAN.md` (this plan)
+    - [X] Create `TODO.md` (this checklist)
+    - [ ] Create `CHANGELOG.md`
+- [ ] Final Review and Submission
+    - [ ] Review all code changes
+    - [ ] Ensure all tests pass
+    - [ ] Ensure documentation is consistent
+    - [ ] Submit changes
