@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased] - {{YYYY-MM-DD}}
+## [Unreleased] - 2024-03-15
 
-### Recent Refinements (Jules, {{YYYY-MM-DD}})
+### Recent Refinements (Jules (AI Assistant), 2024-03-15)
 -   **Packaging:**
     -   Updated `pyproject.toml` to use the correct string format for `project.license` (e.g., "BSD-3-Clause"), resolving a `setuptools` deprecation warning.
     -   Added a dummy C extension (`src/audiostretchy/dummy.c`) and updated `setup.py` to include it. This ensures that Python wheels are built with platform-specific tags (e.g., `...-linux_x86_64.whl`), which is crucial for distributing packages containing pre-compiled binaries via `package_data`.
@@ -19,6 +19,7 @@
 -   **Code Review:**
     -   Reviewed and confirmed that the core logic in `src/audiostretchy/stretch.py` correctly uses `pedalboard` for I/O and resampling, and the custom C library (`TDHSAudioStretch`) for the actual time-stretching, aligning with the project's architectural goals.
     -   Verified C library integration via `ctypes` in `src/audiostretchy/interface/tdhs.py` and the CI workflow for compiling these libraries.
+    -   Reviewed and confirmed `README.md`, docstrings, and `CHANGELOG.md` accurately reflect the project's current state, architecture, and usage.
 
 ### Architectural Changes
 
