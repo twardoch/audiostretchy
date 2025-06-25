@@ -1,7 +1,6 @@
-import wave
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Optional, Tuple, Union
+from typing import BinaryIO
 from wave import Wave_read, Wave_write
 
 import numpy as np
@@ -32,9 +31,9 @@ class AudioStretch:
 
     def open(
         self,
-        path: Optional[Union[str, Path]] = None,
-        file: Optional[BinaryIO] = None,
-        format: Optional[str] = None,
+        path: str | Path | None = None,
+        file: BinaryIO | None = None,
+        format: str | None = None,
     ):
         """
         Open an audio file.
@@ -107,9 +106,9 @@ class AudioStretch:
 
     def save(
         self,
-        path: Optional[Union[str, Path]] = None,
-        file: Optional[BinaryIO] = None,
-        format: Optional[str] = None,
+        path: str | Path | None = None,
+        file: BinaryIO | None = None,
+        format: str | None = None,
     ):
         """
         Save the audio file.
@@ -152,7 +151,7 @@ class AudioStretch:
             encoder.set_channels(self.nchannels)
             encoder.set_quality(quality)
             encoder.set_mode(
-                mp3.MODE_STEREO if self.nchannels == 2 else mp3.MODE_SINGLE_CHANNEL
+                mp3.MODE_STEREO if nchannels == 2 else mp3.MODE_SINGLE_CHANNEL
             )
             encoder.write(self.pcm)
         except ImportError:
@@ -208,10 +207,12 @@ class AudioStretch:
             channels (int): Number of audio channels.
 
         Returns:
-            float: RMS level in dB.
+            float: RMS level in dB, or -infinity for silent segments.
         """
-        rms_sum = 0.0
+        if samples == 0:
+            return float("-inf")
 
+        rms_sum = 0.0
         for i in range(samples):
             if channels == 1:
                 rms_sum += float(audio[i]) * audio[i]
@@ -219,7 +220,11 @@ class AudioStretch:
                 average = (audio[i * 2] + audio[i * 2 + 1]) / 2.0
                 rms_sum += average * average
 
-        return 10.0 * np.log10(rms_sum / samples / (32768.0 * 32767.0 * 0.5))
+        # Add a small epsilon to prevent log10(0)
+        normalized_sum = rms_sum / samples / (32768.0 * 32767.0 * 0.5)
+        epsilon = 1e-10  # Small value to prevent log10(0)
+
+        return 10.0 * np.log10(max(normalized_sum, epsilon))
 
     def resample(self, framerate: int):
         """

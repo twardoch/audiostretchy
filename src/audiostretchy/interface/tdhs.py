@@ -21,6 +21,7 @@ Below are ctypes bindings to the library.
 import ctypes
 import platform
 from pathlib import Path
+
 import numpy as np
 
 if platform.system() == "Windows":

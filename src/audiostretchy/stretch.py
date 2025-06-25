@@ -1,7 +1,7 @@
-import wave  # Keep for now, may be removed if pedalboard handles all aspects
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Optional, Union  # Tuple removed
+from typing import BinaryIO
+from wave import Wave_read, Wave_write
 
 import numpy as np
 import pedalboard
@@ -36,9 +36,9 @@ class AudioStretch:
 
     def open(
         self,
-        path: Optional[Union[str, Path]] = None,
-        file: Optional[BinaryIO] = None,
-        # format parameter is largely handled by pedalboard by extension or content
+        path: str | Path | None = None,
+        file: BinaryIO | None = None,
+        format: str | None = None,
     ):
         """
         Open an audio file using Pedalboard.
@@ -67,10 +67,9 @@ class AudioStretch:
 
     def save(
         self,
-        path: Optional[Union[str, Path]] = None,
-        file: Optional[BinaryIO] = None,
-        output_format: Optional[str] = None,  # e.g., "wav", "mp3", "flac"
-        # TODO: Add parameters for quality/bitrate for formats like MP3
+        path: str | Path | None = None,
+        file: BinaryIO | None = None,
+        format: str | None = None,
     ):
         """
         Save the audio file using Pedalboard.
@@ -142,29 +141,29 @@ class AudioStretch:
         Resample the audio using Pedalboard.
 
         Args:
-            target_framerate (int): Target framerate for resampling.
+            audio (np.ndarray): Audio data.
+            samples (int): Number of samples.
+            channels (int): Number of audio channels.
+
+        Returns:
+            float: RMS level in dB, or -infinity for silent segments.
         """
-        if self.samples is None:
-            raise ValueError("No audio data to resample. Call open() first.")
-        if target_framerate <= 0 or target_framerate == self.framerate:
-            return  # No resampling needed
+        if samples == 0:
+            return float("-inf")
 
-        current_samples = self.samples  # This is (channels, frames) at self.framerate
+        rms_sum = 0.0
+        for i in range(samples):
+            if channels == 1:
+                rms_sum += float(audio[i]) * audio[i]
+            else:
+                average = (audio[i * 2] + audio[i * 2 + 1]) / 2.0
+                rms_sum += average * average
 
-        # Pedalboard processes audio block by block, best to create a board
-        board = Pedalboard(
-            [
-                Resample(
-                    target_sample_rate=target_framerate,
-                    quality=pedalboard.Resample.Quality.HQ,  # Try HQ, default
-                )
-            ]
-        )
+        # Add a small epsilon to prevent log10(0)
+        normalized_sum = rms_sum / samples / (32768.0 * 32767.0 * 0.5)
+        epsilon = 1e-10  # Small value to prevent log10(0)
 
-        # Process the audio through the board, providing the input sample rate.
-        resampled_audio = board(current_samples, sample_rate=self.framerate)
-
-        self.samples = resampled_audio
+        return 10.0 * np.log10(max(normalized_sum, epsilon))
 
         self.framerate = target_framerate
 

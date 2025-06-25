@@ -1,0 +1,7 @@
+EXPORTS
+    stretch_init
+    stretch_output_capacity
+    stretch_samples
+    stretch_flush
+    stretch_reset
+    stretch_deinit
