@@ -1,15 +1,13 @@
-import wave  # Keep for now, may be removed if pedalboard handles all aspects
+import wave # Keep for now, may be removed if pedalboard handles all aspects
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Optional, Union  # Tuple removed
+from typing import BinaryIO, Optional, Union # Tuple removed
 
 import numpy as np
 import pedalboard
-from pedalboard import Pedalboard, Resample  # Explicit imports, removed AudioFile
-from pedalboard import time_stretch as TimeStretch  # Corrected import
-from pedalboard.io import (
-    AudioFile as PedalboardAudioFile,
-)  # Alias for clarity is correctly used
+from pedalboard import Pedalboard, Resample # Explicit imports, removed AudioFile
+from pedalboard import time_stretch as TimeStretch # Corrected import
+from pedalboard.io import AudioFile as PedalboardAudioFile # Alias for clarity is correctly used
 
 # Assuming TDHSAudioStretch might be conditionally used or replaced entirely.
 # If fully replaced, this import and the vendors/stretch submodule might be removable later.
@@ -23,16 +21,14 @@ class AudioStretch:
     Uses a wrapped C library (TDHSAudioStretch) for the core time-stretching algorithm.
     """
 
-    def __init__(
-        self,
-    ):  # ext parameter removed as its usage was unclear and likely tied to old pcm handling
+    def __init__(self): # ext parameter removed as its usage was unclear and likely tied to old pcm handling
         """
         Constructor for the AudioStretch class.
         """
         self.nchannels = 1
-        self.framerate = 44100  # Default, will be updated from file
-        self.in_samples = None  # Will be float32 numpy array
-        self.samples = None  # Will be float32 numpy array, processed audio
+        self.framerate = 44100 # Default, will be updated from file
+        self.in_samples = None # Will be float32 numpy array
+        self.samples = None    # Will be float32 numpy array, processed audio
 
     def open(
         self,
@@ -52,24 +48,23 @@ class AudioStretch:
             raise ValueError("Either path or file must be provided.")
 
         if isinstance(input_source, Path):
-            input_source = str(
-                input_source
-            )  # Pedalboard AudioFile expects str or file-like
+            input_source = str(input_source) # Pedalboard AudioFile expects str or file-like
 
         try:
             with PedalboardAudioFile(input_source) as f:
                 self.in_samples = f.read(f.frames)
                 self.framerate = f.samplerate
                 self.nchannels = f.num_channels
-            self.samples = self.in_samples.copy()  # Start with a copy for processing
+            self.samples = self.in_samples.copy() # Start with a copy for processing
         except Exception as e:
             raise IOError(f"Could not open audio file {input_source}: {e}") from e
+
 
     def save(
         self,
         path: Optional[Union[str, Path]] = None,
         file: Optional[BinaryIO] = None,
-        output_format: Optional[str] = None,  # e.g., "wav", "mp3", "flac"
+        output_format: Optional[str] = None, # e.g., "wav", "mp3", "flac"
         # TODO: Add parameters for quality/bitrate for formats like MP3
     ):
         """
@@ -86,9 +81,7 @@ class AudioStretch:
             raise ValueError("Either path or file must be provided for saving.")
 
         if isinstance(output_target, Path):
-            output_target = str(
-                output_target
-            )  # Keep for error message if it fails before open
+            output_target = str(output_target) # Keep for error message if it fails before open
 
         if self.samples is None:
             raise ValueError("No audio data to save. Call open() and process first.")
@@ -98,29 +91,27 @@ class AudioStretch:
         processed_samples = self.samples
 
         # Ensure it's C-contiguous, especially if it might have been sliced or modified in ways that change flags.
-        if not processed_samples.flags["C_CONTIGUOUS"]:
-            processed_samples = np.ascontiguousarray(
-                processed_samples, dtype=np.float32
-            )
+        if not processed_samples.flags['C_CONTIGUOUS']:
+            processed_samples = np.ascontiguousarray(processed_samples, dtype=np.float32)
 
         try:
-            if isinstance(output_target, str) and not file:  # If it's a path string
+            if isinstance(output_target, str) and not file: # If it's a path string
                 with open(output_target, "wb") as actual_file_obj:
                     with PedalboardAudioFile(
-                        actual_file_obj,  # Pass the file object
+                        actual_file_obj, # Pass the file object
                         mode="w",
                         samplerate=self.framerate,
                         num_channels=self.nchannels,
-                        format=output_format or Path(output_target).suffix[1:],
+                        format=output_format or Path(output_target).suffix[1:]
                     ) as f:
                         f.write(processed_samples)
-            elif file:  # If it was a file object to begin with
-                with PedalboardAudioFile(
-                    file,  # Pass the original file object
+            elif file: # If it was a file object to begin with
+                 with PedalboardAudioFile(
+                    file, # Pass the original file object
                     mode="w",
                     samplerate=self.framerate,
                     num_channels=self.nchannels,
-                    format=output_format,
+                    format=output_format
                 ) as f:
                     f.write(processed_samples)
             else:
@@ -129,9 +120,7 @@ class AudioStretch:
 
         except Exception as e:
             # Ensure output_target for the error message is the original path/file identifier
-            error_location = path or (
-                file.name if hasattr(file, "name") else "provided file object"
-            )
+            error_location = path or (file.name if hasattr(file, 'name') else 'provided file object')
             raise IOError(f"Could not save audio file to {error_location}: {e}") from e
 
     # pcm_decode and pcm_encode are no longer needed as pedalboard handles this.
@@ -147,19 +136,24 @@ class AudioStretch:
         if self.samples is None:
             raise ValueError("No audio data to resample. Call open() first.")
         if target_framerate <= 0 or target_framerate == self.framerate:
-            return  # No resampling needed
-
-        current_samples = self.samples  # This is (channels, frames) at self.framerate
+            return # No resampling needed
 
         # Pedalboard processes audio block by block, best to create a board
-        board = Pedalboard(
-            [
-                Resample(
-                    target_sample_rate=target_framerate,
-                    quality=pedalboard.Resample.Quality.HQ,  # Try HQ, default
-                )
-            ]
-        )
+        board = Pedalboard([
+            Resample(
+                target_sample_rate=target_framerate, # Corrected parameter name
+                # quality="HQ" or "VHQ" can be set if desired, default is usually good
+            )
+        ])
+
+        current_samples = self.samples # This is (channels, frames) at self.framerate
+
+        board = Pedalboard([
+            Resample(
+                target_sample_rate=target_framerate,
+                quality=pedalboard.Resample.Quality.Linear # Corrected case
+            )
+        ])
 
         # Process the audio through the board, providing the input sample rate.
         resampled_audio = board(current_samples, sample_rate=self.framerate)
@@ -167,6 +161,7 @@ class AudioStretch:
         self.samples = resampled_audio
 
         self.framerate = target_framerate
+
 
     def stretch(
         self,
@@ -199,11 +194,11 @@ class AudioStretch:
         if self.samples is None:
             raise ValueError("No audio data to stretch. Call open() first.")
 
-        if ratio == 1.0 and gap_ratio == 0.0:  # Or gap_ratio == ratio
-            # More precise check: if gap_ratio is effectively same as ratio
+        if ratio == 1.0 and gap_ratio == 0.0: # Or gap_ratio == ratio
+             # More precise check: if gap_ratio is effectively same as ratio
             effective_gap_ratio = gap_ratio if gap_ratio != 0.0 else ratio
             if ratio == 1.0 and effective_gap_ratio == 1.0:
-                return  # No stretching needed
+                return # No stretching needed
 
         # Pedalboard samples are float32, shape (num_channels, num_frames)
         # TDHS C library expects int16, interleaved if stereo [L, R, L, R, ...]
@@ -220,19 +215,13 @@ class AudioStretch:
             # For stereo, interleave L and R channels
             pcm_data_in = np.ascontiguousarray(int16_samples.T.ravel())
         else:
-            raise ValueError(
-                f"TDHSAudioStretch currently supports 1 or 2 channels, not {self.nchannels}"
-            )
+            raise ValueError(f"TDHSAudioStretch currently supports 1 or 2 channels, not {self.nchannels}")
 
         flags = 0
         if fast_detection:
             flags |= TDHSAudioStretch.STRETCH_FAST_FLAG
-        if (
-            double_range
-            or ratio < 0.5
-            or ratio > 2.0
-            or (gap_ratio != 0.0 and (gap_ratio < 0.5 or gap_ratio > 2.0))
-        ):
+        if double_range or ratio < 0.5 or ratio > 2.0 or \
+           (gap_ratio != 0.0 and (gap_ratio < 0.5 or gap_ratio > 2.0)):
             flags |= TDHSAudioStretch.STRETCH_DUAL_FLAG
 
         # Note: normal_detection is implicitly handled by not setting STRETCH_FAST_FLAG
@@ -269,22 +258,12 @@ class AudioStretch:
 
         # Output capacity estimation
         # For dual flag, max_ratio can be 4.0, else 2.0
-        max_effective_ratio_for_capacity = (
-            4.0 if (flags & TDHSAudioStretch.STRETCH_DUAL_FLAG) else 2.0
-        )
+        max_effective_ratio_for_capacity = 4.0 if (flags & TDHSAudioStretch.STRETCH_DUAL_FLAG) else 2.0
         # If actual ratio is smaller, use that for a tighter bound
-        max_effective_ratio_for_capacity = max(
-            ratio,
-            (
-                max_effective_ratio_for_capacity
-                if ratio > 1.0
-                else 1.0 / ratio if ratio != 0 else 1.0
-            ),
-        )
+        max_effective_ratio_for_capacity = max(ratio, max_effective_ratio_for_capacity if ratio > 1.0 else 1.0/ratio if ratio !=0 else 1.0)
 
-        out_capacity = stretcher.output_capacity(
-            num_input_frames_per_channel, max_effective_ratio_for_capacity
-        )
+
+        out_capacity = stretcher.output_capacity(num_input_frames_per_channel, max_effective_ratio_for_capacity)
         pcm_data_out = np.zeros(out_capacity * self.nchannels, dtype=np.int16)
 
         num_processed_frames = stretcher.process_samples(
@@ -294,26 +273,20 @@ class AudioStretch:
         # Flush any remaining samples
         # The flush buffer needs to be large enough.
         # Output_capacity should also cover typical flush sizes from TDHS.
-        pcm_data_flush_out = np.zeros(
-            out_capacity * self.nchannels, dtype=np.int16
-        )  # Re-use capacity estimate
+        pcm_data_flush_out = np.zeros(out_capacity * self.nchannels, dtype=np.int16) # Re-use capacity estimate
         num_flushed_frames = stretcher.flush(pcm_data_flush_out)
 
         # Concatenate processed and flushed samples
         actual_output_samples_int16 = np.concatenate(
-            (
-                pcm_data_out[: num_processed_frames * self.nchannels],
-                pcm_data_flush_out[: num_flushed_frames * self.nchannels],
-            )
+            (pcm_data_out[:num_processed_frames * self.nchannels],
+             pcm_data_flush_out[:num_flushed_frames * self.nchannels])
         )
 
         stretcher.deinit()
 
         # Convert back to float32 and de-interleave
         # TDHS output is also int16, interleaved
-        float32_output_samples = (
-            actual_output_samples_int16.astype(np.float32) / 32767.0
-        )
+        float32_output_samples = actual_output_samples_int16.astype(np.float32) / 32767.0
 
         if self.nchannels == 1:
             self.samples = float32_output_samples.reshape(1, -1)
@@ -333,11 +306,11 @@ def stretch_audio(
     gap_ratio: float = 0.0,
     upper_freq: int = 333,
     lower_freq: int = 55,
-    buffer_ms: float = 25,  # Currently not used effectively by Python stretch method
-    threshold_gap_db: float = -40,  # Currently not used effectively
+    buffer_ms: float = 25, # Currently not used effectively by Python stretch method
+    threshold_gap_db: float = -40, # Currently not used effectively
     double_range: bool = False,
     fast_detection: bool = False,
-    normal_detection: bool = False,  # Currently not used effectively
+    normal_detection: bool = False, # Currently not used effectively
     sample_rate: int = 0,
 ):
     """
@@ -367,14 +340,14 @@ def stretch_audio(
     # without Python-side audio segmentation logic for silence.
     audio_processor.stretch(
         ratio=ratio,
-        gap_ratio=gap_ratio,  # Passed to C, but C python wrapper doesn't use it for segmentation
+        gap_ratio=gap_ratio, # Passed to C, but C python wrapper doesn't use it for segmentation
         upper_freq=upper_freq,
         lower_freq=lower_freq,
         buffer_ms=buffer_ms,
         threshold_gap_db=threshold_gap_db,
         double_range=double_range,
         fast_detection=fast_detection,
-        normal_detection=normal_detection,
+        normal_detection=normal_detection
     )
 
     # 2. Resample (if needed)

@@ -1,28 +1,34 @@
 import pytest
 from pathlib import Path
 import numpy as np
-import soundfile # Using soundfile for reliable audio properties comparison
+import soundfile  # Using soundfile for reliable audio properties comparison
 
 from audiostretchy.stretch import AudioStretch, stretch_audio
 
+
 # Helper function to get audio properties
 def get_audio_properties(file_path):
-    with soundfile.SoundFile(file_path, 'r') as sf:
+    with soundfile.SoundFile(file_path, "r") as sf:
         return sf.samplerate, sf.channels, sf.frames
+
 
 @pytest.fixture
 def audio_processor():
     return AudioStretch()
 
+
 @pytest.fixture
 def sample_wav_path():
     return Path("tests/audio.wav")
+
 
 @pytest.fixture
 def sample_mp3_path():
     return Path("tests/audio.mp3")
 
+
 # --- Test AudioStretch Class ---
+
 
 def test_open_wav(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
@@ -37,6 +43,7 @@ def test_open_wav(audio_processor, sample_wav_path):
     assert audio_processor.samples.shape == (sf_channels, sf_frames)
     assert audio_processor.in_samples.dtype == np.float32
 
+
 def test_open_mp3(audio_processor, sample_mp3_path):
     # This requires ffmpeg to be installed for pedalboard to read mp3s usually
     try:
@@ -47,8 +54,10 @@ def test_open_mp3(audio_processor, sample_mp3_path):
         assert audio_processor.samples is not None
         assert audio_processor.in_samples.dtype == np.float32
     except IOError as e:
-        pytest.skip(f"Skipping MP3 test, pedalboard couldn't open MP3 (possibly missing ffmpeg or backend): {e}")
-    except Exception as e: # Catch any other pedalboard/soundfile error during open
+        pytest.skip(
+            f"Skipping MP3 test, pedalboard couldn't open MP3 (possibly missing ffmpeg or backend): {e}"
+        )
+    except Exception as e:  # Catch any other pedalboard/soundfile error during open
         pytest.skip(f"Skipping MP3 test due to an unexpected error during open: {e}")
 
 
@@ -71,16 +80,19 @@ def test_save_mp3(audio_processor, sample_wav_path, tmp_path):
     audio_processor.open(sample_wav_path)
     output_path = tmp_path / "output.mp3"
     try:
-        audio_processor.save(output_path, output_format="mp3") # Specify format
+        audio_processor.save(output_path, output_format="mp3")  # Specify format
         assert output_path.exists()
         # Check basic properties. MP3 encoding can sometimes slightly alter frame counts or lead to skips.
         rate, channels, _ = get_audio_properties(output_path)
         assert rate == audio_processor.framerate
         assert channels == audio_processor.nchannels
     except IOError as e:
-        pytest.skip(f"Skipping MP3 save test, pedalboard couldn't save MP3 (possibly missing ffmpeg or backend): {e}")
+        pytest.skip(
+            f"Skipping MP3 save test, pedalboard couldn't save MP3 (possibly missing ffmpeg or backend): {e}"
+        )
     except Exception as e:
         pytest.skip(f"Skipping MP3 save test due to an unexpected error: {e}")
+
 
 def test_resample(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
@@ -97,7 +109,8 @@ def test_resample(audio_processor, sample_wav_path):
     expected_frames = int(original_frames * (target_framerate / original_framerate))
 
     # Resampling can have slight variations in frame count
-    assert abs(current_frames - expected_frames) < 5 # Allow small deviation
+    assert abs(current_frames - expected_frames) < 5  # Allow small deviation
+
 
 def test_resample_noop(audio_processor, sample_wav_path):
     """Test that resampling to the same sample rate is a no-op."""
@@ -110,17 +123,19 @@ def test_resample_noop(audio_processor, sample_wav_path):
     assert audio_processor.samples.shape == original_samples.shape
     assert (audio_processor.samples == original_samples).all()
 
+
 def test_stretch_no_change(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
     original_samples_shape = audio_processor.samples.shape
     audio_processor.stretch(ratio=1.0)
     assert audio_processor.samples.shape == original_samples_shape
 
+
 def test_stretch_longer(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
     # audio_processor.samples is (channels, frames) after open
     original_frames = audio_processor.samples.shape[1]
-    ratio = 1.5 # Make 50% longer
+    ratio = 1.5  # Make 50% longer
     audio_processor.stretch(ratio=ratio)
 
     # After stretch, self.samples is (channels, frames)
@@ -128,22 +143,151 @@ def test_stretch_longer(audio_processor, sample_wav_path):
     expected_frames = int(original_frames * ratio)
 
     # Time stretching isn't always perfectly exact to the sample, allow some leeway
-    assert abs(current_frames - expected_frames) < original_frames * 0.05 # 5% leeway
+    assert abs(current_frames - expected_frames) < original_frames * 0.05  # 5% leeway
+
 
 def test_stretch_shorter(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
     # audio_processor.samples is (channels, frames) after open
     original_frames = audio_processor.samples.shape[1]
-    ratio = 0.75 # Make 25% shorter
+    ratio = 0.75  # Make 25% shorter
     audio_processor.stretch(ratio=ratio)
 
     # After stretch, self.samples is (channels, frames)
     current_frames = audio_processor.samples.shape[1]
     expected_frames = int(original_frames * ratio)
 
-    assert abs(current_frames - expected_frames) < original_frames * 0.05 # 5% leeway
+    assert abs(current_frames - expected_frames) < original_frames * 0.05  # 5% leeway
+
+
+@pytest.mark.parametrize("ratio_val", [0.75, 1.0, 1.5])
+@pytest.mark.parametrize("fast_detection_val", [True, False])
+@pytest.mark.parametrize("double_range_val", [True, False])
+def test_stretch_various_params(
+    audio_processor, sample_wav_path, ratio_val, fast_detection_val, double_range_val
+):
+    """Test stretching with various TDHS parameters."""
+    audio_processor.open(sample_wav_path)
+    original_frames = audio_processor.samples.shape[1]
+
+    # Adjust ratio if double_range is True and ratio is outside normal
+    if double_range_val and ratio_val == 1.5:
+        effective_ratio = 2.5  # Example of a ratio needing double_range
+    elif double_range_val and ratio_val == 0.75:
+        effective_ratio = 0.4  # Example of a ratio needing double_range
+    else:
+        effective_ratio = ratio_val
+        # If not using double_range, ensure effective_ratio is within 0.5-2.0 for TDHS non-dual mode
+        if not double_range_val:
+            if effective_ratio > 2.0:
+                effective_ratio = 2.0
+            if effective_ratio < 0.5:
+                effective_ratio = 0.5
+
+    audio_processor.stretch(
+        ratio=effective_ratio,
+        fast_detection=fast_detection_val,
+        double_range=double_range_val,
+        upper_freq=300,  # Non-default
+        lower_freq=60,  # Non-default
+    )
+
+    current_frames = audio_processor.samples.shape[1]
+
+    # If ratio is 1.0, no change in frames expected
+    if effective_ratio == 1.0:
+        expected_frames = original_frames
+    else:
+        expected_frames = int(original_frames * effective_ratio)
+
+    # Allow a slightly larger leeway for varying parameters that might affect period detection
+    assert abs(current_frames - expected_frames) < original_frames * 0.07  # 7% leeway
+
+
+def test_stretch_double_range_extreme(audio_processor, sample_wav_path):
+    """Test stretching with double_range for ratios like 0.25 and 4.0."""
+    audio_processor.open(sample_wav_path)
+    original_frames = audio_processor.samples.shape[1]
+
+    ratios_to_test = [0.25, 4.0]
+    for r in ratios_to_test:
+        # Re-open to reset samples for each ratio test
+        audio_processor.open(sample_wav_path)
+        audio_processor.stretch(ratio=r, double_range=True)
+        current_frames = audio_processor.samples.shape[1]
+        expected_frames = int(original_frames * r)
+        assert (
+            abs(current_frames - expected_frames) < original_frames * 0.07
+        )  # 7% leeway
+
+
+# Test gap_ratio - current behavior is that it doesn't segment in Python
+def test_stretch_with_gap_ratio(audio_processor, sample_wav_path):
+    """
+    Tests that providing gap_ratio doesn't crash.
+    Note: Current Python wrapper does not implement silence segmentation logic
+    like the C CLI. The gap_ratio is passed to C but stretch_samples in C
+    takes only one ratio for the whole segment.
+    """
+    audio_processor.open(sample_wav_path)
+    original_frames = audio_processor.samples.shape[1]
+    ratio = 1.2
+    gap_ratio_val = 0.5
+
+    audio_processor.stretch(ratio=ratio, gap_ratio=gap_ratio_val)
+
+    current_frames = audio_processor.samples.shape[1]
+    expected_frames = int(original_frames * ratio)  # Expects change based on main ratio
+    assert abs(current_frames - expected_frames) < original_frames * 0.05
+
+
+# --- Test File-like object I/O ---
+def test_open_wav_filelike(audio_processor, sample_wav_path):
+    sf_rate, sf_channels, sf_frames = get_audio_properties(sample_wav_path)
+    with open(sample_wav_path, "rb") as f:
+        file_content = f.read()
+
+    import io
+
+    file_like_object = io.BytesIO(file_content)
+
+    audio_processor.open(file=file_like_object)
+
+    assert audio_processor.framerate == sf_rate
+    assert audio_processor.nchannels == sf_channels
+    assert audio_processor.in_samples.shape == (sf_channels, sf_frames)
+
+
+def test_save_wav_filelike(audio_processor, sample_wav_path, tmp_path):
+    audio_processor.open(sample_wav_path)
+    original_samples = audio_processor.samples.copy()
+    original_framerate = audio_processor.framerate
+    original_nchannels = audio_processor.nchannels
+
+    import io
+
+    file_like_object = io.BytesIO()
+
+    audio_processor.save(file=file_like_object, output_format="wav")
+
+    file_like_object.seek(0)  # Rewind to read
+
+    # Verify by loading with pedalboard from BytesIO
+    # Use the imported alias PedalboardAudioFile
+    from pedalboard.io import AudioFile as PedalboardAudioFile_local
+
+    with PedalboardAudioFile_local(file_like_object) as af:
+        loaded_samples = af.read(af.frames)
+        assert af.samplerate == original_framerate
+        assert af.num_channels == original_nchannels
+        assert loaded_samples.shape == original_samples.shape
+        assert np.allclose(
+            loaded_samples, original_samples, atol=1e-5
+        )  # Compare content
+
 
 # --- Test stretch_audio global function (CLI entry point) ---
+
 
 def test_stretch_audio_func_wav_to_wav(sample_wav_path, tmp_path):
     input_path = sample_wav_path
@@ -159,7 +303,8 @@ def test_stretch_audio_func_wav_to_wav(sample_wav_path, tmp_path):
     assert out_rate == in_rate
     assert out_channels == in_channels
     expected_frames = int(in_frames * ratio)
-    assert abs(out_frames - expected_frames) < in_frames * 0.05 # 5% leeway
+    assert abs(out_frames - expected_frames) < in_frames * 0.05  # 5% leeway
+
 
 def test_stretch_audio_func_mp3_to_mp3(sample_mp3_path, tmp_path):
     input_path = sample_mp3_path
@@ -173,7 +318,9 @@ def test_stretch_audio_func_mp3_to_mp3(sample_mp3_path, tmp_path):
             in_rate, in_channels, in_frames = get_audio_properties(input_path)
             in_props_available = True
         except Exception as e:
-             pytest.skip(f"Skipping MP3 integration test: Could not read input MP3 properties ({e}).")
+            pytest.skip(
+                f"Skipping MP3 integration test: Could not read input MP3 properties ({e})."
+            )
 
         if in_props_available:
             stretch_audio(str(input_path), str(output_path), ratio=ratio)
@@ -184,10 +331,14 @@ def test_stretch_audio_func_mp3_to_mp3(sample_mp3_path, tmp_path):
             assert out_channels == in_channels
             expected_frames = int(in_frames * ratio)
             # MP3 encoding/decoding can add/remove priming/padding frames. Leeway might need to be larger.
-            assert abs(out_frames - expected_frames) < in_frames * 0.10 # 10% leeway for MP3
+            assert (
+                abs(out_frames - expected_frames) < in_frames * 0.10
+            )  # 10% leeway for MP3
 
     except IOError as e:
-        pytest.skip(f"Skipping MP3 integration test, pedalboard operation failed (possibly missing ffmpeg or backend): {e}")
+        pytest.skip(
+            f"Skipping MP3 integration test, pedalboard operation failed (possibly missing ffmpeg or backend): {e}"
+        )
     except Exception as e:
         pytest.skip(f"Skipping MP3 integration test due to an unexpected error: {e}")
 
@@ -197,11 +348,14 @@ def test_stretch_audio_func_resample(sample_wav_path, tmp_path):
     output_path = tmp_path / "resampled_audio.wav"
     target_sample_rate = 16000
 
-    stretch_audio(str(input_path), str(output_path), ratio=1.0, sample_rate=target_sample_rate)
+    stretch_audio(
+        str(input_path), str(output_path), ratio=1.0, sample_rate=target_sample_rate
+    )
 
     assert output_path.exists()
     out_rate, _, _ = get_audio_properties(output_path)
     assert out_rate == target_sample_rate
+
 
 def test_stretch_audio_func_stretch_and_resample(sample_wav_path, tmp_path):
     input_path = sample_wav_path
@@ -209,7 +363,9 @@ def test_stretch_audio_func_stretch_and_resample(sample_wav_path, tmp_path):
     ratio = 1.3
     target_sample_rate = 8000
 
-    stretch_audio(str(input_path), str(output_path), ratio=ratio, sample_rate=target_sample_rate)
+    stretch_audio(
+        str(input_path), str(output_path), ratio=ratio, sample_rate=target_sample_rate
+    )
 
     assert output_path.exists()
     in_rate, _, in_frames = get_audio_properties(input_path)
@@ -218,8 +374,13 @@ def test_stretch_audio_func_stretch_and_resample(sample_wav_path, tmp_path):
     assert out_rate == target_sample_rate
     # Expected frames after stretch, then account for resampling
     expected_frames_after_stretch = in_frames * ratio
-    expected_final_frames = int(expected_frames_after_stretch * (target_sample_rate / in_rate))
-    assert abs(out_frames - expected_final_frames) < expected_frames_after_stretch * 0.05 # 5% leeway on stretched length
+    expected_final_frames = int(
+        expected_frames_after_stretch * (target_sample_rate / in_rate)
+    )
+    assert (
+        abs(out_frames - expected_final_frames) < expected_frames_after_stretch * 0.05
+    )  # 5% leeway on stretched length
+
 
 # TODO: Add tests for file-like objects for open/save
 # TODO: Add tests for CLI arguments if Fire CLI parsing changes significantly or needs specific checks.

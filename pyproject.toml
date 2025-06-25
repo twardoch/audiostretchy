@@ -11,7 +11,8 @@ dynamic = ["version"] # Specify that version is dynamic
 description = "AudioStretchy is a Python library and CLI tool that which performs fast, high-quality time-stretching of WAV/MP3 files without changing their pitch. Works well for speech, can time-stretch silence separately. AudioStretchy is a wrapper around the audio-stretch C library by David Bryant."
 readme = "README.md"
 authors = [{name = "Adam Twardoch", email = "adam+github@twardoch.com"}]
-license = { file = "LICENSE.txt" } # Corrected license format
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt", "AUTHORS.md"]
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 4 - Beta",
