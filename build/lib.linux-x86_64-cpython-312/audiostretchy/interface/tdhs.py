@@ -23,12 +23,12 @@ import platform
 from pathlib import Path
 import numpy as np
 
-if platform.system() == "Windows":
-    lib_path = Path(__file__).parent / "win" / "_stretch.dll"
-elif platform.system() == "Darwin":  # Mac
-    lib_path = Path(__file__).parent / "mac" / "_stretch.dylib"
-elif platform.system() == "Linux":  # Linux
-    lib_path = Path(__file__).parent / "linux" / "_stretch.so"
+if platform.system() == 'Windows':
+    lib_path = Path(__file__).parent / 'win' / '_stretch.dll'
+elif platform.system() == 'Darwin':  # Mac
+    lib_path = Path(__file__).parent / 'mac' / '_stretch.dylib'
+elif platform.system() == 'Linux':  # Linux
+    lib_path = Path(__file__).parent / 'linux' / '_stretch.so'
 else:
     raise NotImplementedError("This platform is not supported.")
 
@@ -40,13 +40,10 @@ class TDHSAudioStretch:
     The Stretch class is a Python binding for the _stretch library, providing an interface
     to time-stretch audio signals without changing their pitch.
     """
-
     STRETCH_FAST_FLAG = 0x1
     STRETCH_DUAL_FLAG = 0x2
 
-    def __init__(
-        self, shortest_period: int, longest_period: int, num_chans: int, flags: int
-    ) -> None:
+    def __init__(self, shortest_period: int, longest_period: int, num_chans: int, flags: int) -> None:
         """
         Initialize the stretching context with the given parameters.
 
@@ -106,9 +103,7 @@ class TDHSAudioStretch:
         """
         return self.stretch_output_capacity(self.handle, max_num_samples, max_ratio)
 
-    def process_samples(
-        self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float
-    ) -> int:
+    def process_samples(self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float) -> int:
         """
         Process the samples with a specified ratio.
 
