@@ -94,7 +94,7 @@ class TestAudioStretch:
         
         int16_samples = processor._convert_to_int16(float_samples)
         
-        expected = np.array([0, 16383, -16384, 32767, -32767], dtype=np.int16)
+        expected = np.array([0, 16384, -16384, 32767, -32767], dtype=np.int16)
         np.testing.assert_array_equal(int16_samples, expected)
     
     def test_convert_to_int16_stereo(self):
@@ -111,7 +111,7 @@ class TestAudioStretch:
         int16_samples = processor._convert_to_int16(float_samples)
         
         # Should be interleaved: L0, R0, L1, R1, L2, R2
-        expected = np.array([0, 32767, 16383, -32767, -16384, 0], dtype=np.int16)
+        expected = np.array([0, 32767, 16384, -32767, -16384, 0], dtype=np.int16)
         np.testing.assert_array_equal(int16_samples, expected)
     
     def test_convert_from_int16_mono(self):

@@ -51,11 +51,20 @@ class AudioStretch:
         input_source = file if file is not None else str(path)
         
         try:
-            with AudioFile(input_source, format=format) as f:
-                # Read all audio data into memory
-                self.samples = f.read(f.frames)
-                self.samplerate = f.samplerate
-                self.num_channels = f.num_channels
+            # Don't pass format when opening for reading from file path
+            if isinstance(input_source, str):
+                with AudioFile(input_source) as f:
+                    # Read all audio data into memory
+                    self.samples = f.read(f.frames)
+                    self.samplerate = f.samplerate
+                    self.num_channels = f.num_channels
+            else:
+                # For file-like objects, we might need format
+                with AudioFile(input_source, format=format) as f:
+                    # Read all audio data into memory
+                    self.samples = f.read(f.frames)
+                    self.samplerate = f.samplerate
+                    self.num_channels = f.num_channels
                 
         except Exception as e:
             source_desc = str(path) if path else "file object"
@@ -85,32 +94,43 @@ class AudioStretch:
         if self.samples is None:
             raise ValueError("No audio data to save. Call open() and process first")
             
-        output_target = file if file is not None else str(path)
-        
         # Infer format from path extension if not specified
         if format is None and path is not None:
             format = Path(path).suffix.lstrip(".")
             
         try:
-            with AudioFile(
-                output_target,
-                mode="w",
-                samplerate=self.samplerate,
-                num_channels=self.num_channels,
-                format=format,
-            ) as f:
-                f.write(self.samples)
+            if file is not None:
+                # Use provided file object
+                with AudioFile(
+                    file,
+                    mode="w",
+                    samplerate=self.samplerate,
+                    num_channels=self.num_channels,
+                    format=format,
+                ) as f:
+                    f.write(self.samples)
+            else:
+                # Open file path for writing
+                with open(str(path), 'wb') as fp:
+                    with AudioFile(
+                        fp,
+                        mode="w",
+                        samplerate=self.samplerate,
+                        num_channels=self.num_channels,
+                        format=format,
+                    ) as f:
+                        f.write(self.samples)
                 
         except Exception as e:
             target_desc = str(path) if path else "file object"
             raise IOError(f"Could not save audio file to {target_desc}: {e}") from e
 
-    def resample(self, target_samplerate: int) -> None:
+    def resample(self, target_framerate: int) -> None:
         """
         Resample audio to target sample rate using Pedalboard.
 
         Args:
-            target_samplerate: Target sample rate in Hz
+            target_framerate: Target sample rate in Hz
             
         Raises:
             ValueError: If no audio data is loaded
@@ -118,12 +138,12 @@ class AudioStretch:
         if self.samples is None:
             raise ValueError("No audio data to resample. Call open() first")
             
-        if target_samplerate == self.samplerate:
+        if target_framerate == self.samplerate:
             return  # No resampling needed
             
-        resampler = Resample(target_sample_rate=target_samplerate)
+        resampler = Resample(target_sample_rate=target_framerate)
         self.samples = resampler(self.samples, sample_rate=self.samplerate)
-        self.samplerate = target_samplerate
+        self.samplerate = target_framerate
 
     def stretch(
         self,
@@ -200,7 +220,7 @@ class AudioStretch:
         """Convert float32 samples to int16 format expected by C library."""
         # Clip to valid range and convert
         samples_clipped = np.clip(samples, -1.0, 1.0)
-        samples_int16 = (samples_clipped * 32767).astype(np.int16)
+        samples_int16 = np.round(samples_clipped * 32767).astype(np.int16)
         
         # Interleave channels if stereo
         if self.num_channels == 1:
