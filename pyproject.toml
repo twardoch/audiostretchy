@@ -10,19 +10,17 @@ readme = "README.md"
 authors = [{name = "Adam Twardoch", email = "adam+github@twardoch.com"}]
 license = "BSD-3-Clause"
 license-files = ["LICENSE.txt", "AUTHORS.md"]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: C",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Multimedia :: Sound/Audio :: Conversion",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
@@ -97,22 +95,46 @@ dependencies = [
     "soundfile>=0.12.0",
 ]
 
+[tool.hatch.envs.hatch-test]
+extra-dependencies = [
+    "soundfile>=0.12.0",
+    "pytest-cov>=4.0.0",
+]
+
 # Testing configuration
 [tool.pytest.ini_options]
 addopts = "--cov=src/audiostretchy --cov-report=term-missing --verbose"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
+markers = [
+    "performance: marks tests as performance benchmarks (may be slow)",
+]
 
 # Linting and formatting
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py310"
 extend-exclude = ["build", "dist"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "YTT", "S", "BLE", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM", "TID", "TCH", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
-ignore = ["E203", "W503", "S101", "PLR0913", "PLR0912", "PLR0915", "C901"]
+# A focused, enforceable set: pyflakes/pycodestyle correctness, import order,
+# pyupgrade modernization, bugbear, comprehensions, simplify, naming, pathlib.
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "N", "PTH", "PIE", "RUF"]
+# E501: line length is handled by the formatter; long prose comments are fine.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests favour readability over strictness; the C-library build helper is a
+# standalone script that legitimately prints and shells out.
+"tests/**" = ["N", "B", "SIM", "PTH", "PIE"]
+"src/audiostretchy/c_interface/build.py" = ["PTH", "N"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+# build.py is a standalone C-library build helper, not part of the runtime API.
+exclude = ["build/", "dist/", "c_interface/build\\.py$"]
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312", "py313"]

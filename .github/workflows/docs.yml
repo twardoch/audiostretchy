@@ -1,15 +1,15 @@
-# this_file: _github/workflows/docs.yml
+# this_file: .github/workflows/docs.yml
 
 name: Build and Deploy Documentation
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'src_docs/**'
-      - '_github/workflows/docs.yml'
+      - '.github/workflows/docs.yml'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'src_docs/**'
   workflow_dispatch:
@@ -20,7 +20,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
@@ -29,33 +29,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            
+          python-version: '3.12'
+          cache: pip
+
       - name: Install MkDocs and dependencies
         run: |
-          pip install --upgrade pip
-          pip install mkdocs-material
-          pip install mkdocs-minify-plugin
-          
+          python -m pip install --upgrade pip
+          pip install mkdocs-material mkdocs-minify-plugin
+
       - name: Build documentation
         run: |
           cd src_docs
           mkdocs build --verbose --clean
-          
+
       - name: Upload documentation artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs
 
@@ -69,4 +61,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4

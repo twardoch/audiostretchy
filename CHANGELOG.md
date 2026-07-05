@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased] - 2026-07-05
+
+### Packaging
+
+- **Dropped `setup.py` entirely.** The build is now pure `pyproject.toml` with `hatchling` + `hatch-vcs`; the version is derived from git tags. Removed the broken `setup.py` that referenced an undefined `dummy_ext`.
+- **Python floor raised to 3.10.** Dropped end-of-life 3.8/3.9 from `requires-python`, classifiers, and CI. Removed the obsolete `importlib_metadata` fallback in `__init__.py`.
+- **Honest platform metadata.** Removed the Windows classifier — no `_stretch.dll` ships in `src/audiostretchy/interface/win/`, so Windows is not supported at runtime (tracked in TODO).
+- **Verified wheel packaging.** The built wheel bundles the prebuilt `interface/mac/_stretch.dylib` and `interface/linux/_stretch.so` that `c_interface/wrapper.py` loads.
+
+### Tooling
+
+- **`.gitignore` rewritten.** Now ignores `build/`, `dist/`, `test_env/`, `llms.txt`, and coverage/venv scratch that were previously tracked. Prebuilt shared libraries under `src/` stay tracked.
+- **CI/release/docs workflows modernized.** Fixed the install of the non-existent `.[testing]` extra (now `.[test]`), replaced `flake8` with `ruff` + `mypy`, and bumped every action to a current major (`setup-python@v5`, `upload/download-artifact@v4`, `codecov-action@v5`, `action-gh-release@v2`, `upload-pages-artifact@v3`, `deploy-pages@v4`).
+- **Ruff + mypy are clean.** Replaced the aspirational, never-enforced kitchen-sink rule set (which contained invalid `W503`/`E203` selectors) with a focused, passing configuration; added a `[tool.mypy]` section.
+
+### Code
+
+- **Removed dead legacy modules** `stretch.py` and `interface/tdhs.py` (superseded by `core.py` + `c_interface/wrapper.py`; imported by nothing).
+- **Module docstring in `core.py`** now explains the TDHS algorithm; `ratio` documents its valid bounds (0.5-2.0, or 0.25-4.0 with `double_range`).
+- **Fixed a real type bug:** `samplerate` is now coerced to `int` (Pedalboard reports it as `float`).
+
+### Documentation
+
+- Corrected every stale module reference (`stretch.py`, `interface.tdhs`) in `README.md` and `src_docs/md/` to the real `core.py` / `audiostretchy.c_interface` paths.
+- Added a project icon at `docs/assets/icon.png`.
+
+## [Unreleased] - 2026-06-29
+
+### Modernization
+
+- **Core module**: Renamed primary implementation from `stretch.py` to `core.py`; `__init__.py` re-exports `AudioStretch` and `stretch_audio` for backward compatibility.
+- **Pedalboard 0.9 compatibility**: Replaced deprecated `AudioFile(mode='w')` usage with `ReadableAudioFile`/`WriteableAudioFile` from `pedalboard.io`. Format inference now works correctly for path-based saves; 32-bit float depth used for file-object saves to avoid 16-bit quantization error.
+- **Resampling**: Replaced broken `pedalboard.Resample` plugin (a lo-fi audio effect, not a sample rate converter) with numpy `np.interp` linear interpolation. `resample()` now correctly changes sample count and updates `samplerate`.
+- **Native library discovery**: `c_interface/wrapper.py` now resolves the platform library from the canonical `interface/{mac,linux,win}/` directories (matching the original `interface/tdhs.py` path logic).
+- **Test suite**: All 55 tests pass with 0 failures. Fixed imports from old `audiostretchy.stretch` to `audiostretchy.core`; updated attribute names (`nchannels` to `num_channels`, `framerate` to `samplerate`, `in_samples` to `samples`); registered `performance` pytest marker; added `soundfile` and `pytest-cov` to `hatch-test` extra-dependencies.
+- **CLI**: Removed non-public `fire.core.Display` monkey-patch that silenced all help output.
+- **Documentation**: Updated all code examples in `src_docs/md/` and `README.md` to import from `audiostretchy` (package root) instead of `audiostretchy.stretch`.
+- **Type hints and docstrings**: All public methods in `core.py` carry full type annotations and descriptive docstrings.
+
 ## [Unreleased] - 2024-03-15
 
 ### Recent Refinements (Jules (AI Assistant), 2024-03-15)

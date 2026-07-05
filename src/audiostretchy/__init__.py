@@ -7,12 +7,7 @@ for versatile audio I/O to provide fast, high-quality time-stretching
 of audio files without changing their pitch.
 """
 
-import sys
-
-if sys.version_info[:2] >= (3, 8):
-    from importlib.metadata import PackageNotFoundError, version
-else:
-    from importlib_metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__ = version("audiostretchy")
@@ -23,4 +18,4 @@ finally:
 
 from .core import AudioStretch, stretch_audio
 
-__all__ = ["AudioStretch", "stretch_audio", "__version__"]
+__all__ = ["AudioStretch", "__version__", "stretch_audio"]

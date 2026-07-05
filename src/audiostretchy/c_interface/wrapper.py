@@ -7,7 +7,6 @@ Provides high-level interface to the TDHS (Time-Domain Harmonic Scaling) algorit
 import ctypes
 import platform
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -22,11 +21,7 @@ class TDHSAudioStretch:
     STRETCH_DUAL_FLAG = 0x2
 
     def __init__(
-        self, 
-        shortest_period: int, 
-        longest_period: int, 
-        num_chans: int, 
-        flags: int
+        self, shortest_period: int, longest_period: int, num_chans: int, flags: int
     ) -> None:
         """
         Initialize the stretching context.
@@ -39,47 +34,31 @@ class TDHSAudioStretch:
         """
         self._lib = self._load_library()
         self._setup_function_signatures()
-        
-        self.handle = self.stretch_init(shortest_period, longest_period, num_chans, flags)
+
+        self.handle = self.stretch_init(
+            shortest_period, longest_period, num_chans, flags
+        )
         if not self.handle:
             raise RuntimeError("Failed to initialize audio stretch context")
 
     def _load_library(self) -> ctypes.CDLL:
-        """Load the appropriate shared library for the current platform."""
+        """Load the appropriate shared library for the current platform.
+
+        Prebuilt libraries ship in ``src/audiostretchy/interface/{platform}/``:
+        ``mac/_stretch.dylib``, ``linux/_stretch.so`` and ``win/_stretch.dll``.
+        """
         system = platform.system()
-        arch = platform.machine().lower()
-        
-        # Determine library filename based on platform and architecture
+        # Canonical paths match the bundled layout in interface/
+        interface_dir = Path(__file__).parent.parent / "interface"
         if system == "Windows":
-            if arch in ("amd64", "x86_64"):
-                lib_name = "_stretch_x64.dll"
-            else:
-                lib_name = "_stretch.dll"
-        elif system == "Darwin":  # macOS
-            if arch in ("arm64", "aarch64"):
-                lib_name = "_stretch_arm64.dylib"
-            else:
-                lib_name = "_stretch_x64.dylib"
+            lib_path = interface_dir / "win" / "_stretch.dll"
+        elif system == "Darwin":
+            lib_path = interface_dir / "mac" / "_stretch.dylib"
         elif system == "Linux":
-            if arch in ("aarch64", "arm64"):
-                lib_name = "_stretch_aarch64.so"
-            else:
-                lib_name = "_stretch_x64.so"
+            lib_path = interface_dir / "linux" / "_stretch.so"
         else:
             raise RuntimeError(f"Unsupported platform: {system}")
 
-        # Look for the library in the package directory
-        lib_path = Path(__file__).parent / "lib" / lib_name
-        
-        if not lib_path.exists():
-            # Fallback to generic name
-            generic_names = {
-                "Windows": "_stretch.dll",
-                "Darwin": "_stretch.dylib", 
-                "Linux": "_stretch.so"
-            }
-            lib_path = Path(__file__).parent / "lib" / generic_names[system]
-            
         if not lib_path.exists():
             raise RuntimeError(f"Audio stretch library not found at {lib_path}")
 
@@ -92,12 +71,21 @@ class TDHSAudioStretch:
         """Set up ctypes function signatures for the C library."""
         # stretch_init
         self.stretch_init = self._lib.stretch_init
-        self.stretch_init.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+        self.stretch_init.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
         self.stretch_init.restype = ctypes.c_void_p
 
         # stretch_output_capacity
         self.stretch_output_capacity = self._lib.stretch_output_capacity
-        self.stretch_output_capacity.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_float]
+        self.stretch_output_capacity.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_float,
+        ]
         self.stretch_output_capacity.restype = ctypes.c_int
 
         # stretch_samples
@@ -143,11 +131,7 @@ class TDHSAudioStretch:
         return self.stretch_output_capacity(self.handle, max_num_samples, max_ratio)
 
     def process_samples(
-        self, 
-        samples: np.ndarray, 
-        num_samples: int, 
-        output: np.ndarray, 
-        ratio: float
+        self, samples: np.ndarray, num_samples: int, output: np.ndarray, ratio: float
     ) -> int:
         """
         Process audio samples with specified stretch ratio.

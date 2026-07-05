@@ -15,7 +15,7 @@ AudioStretchy provides a comprehensive Python API for integrating time-stretchin
 The `stretch_audio` function provides the simplest way to process audio files:
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 # Basic stretching
 stretch_audio("input.mp3", "output.wav", ratio=1.2)
@@ -78,7 +78,7 @@ For advanced control and multiple operations, use the `AudioStretch` class:
 ### Basic Class Usage
 
 ```python
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 # Initialize processor
 processor = AudioStretch()
@@ -115,7 +115,7 @@ processor.stretch(
 )
 
 # Optional resampling
-processor.resample(target_framerate=48000)
+processor.resample(48000)
 
 # Save with explicit format
 processor.save("processed.wav")
@@ -161,7 +161,7 @@ For in-memory processing without file I/O:
 
 ```python
 from io import BytesIO
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 # Read audio data into memory
 with open("input.mp3", "rb") as f:
@@ -211,7 +211,7 @@ def process_audio_stream(input_stream, output_stream, ratio=1.0):
 ### Common Exceptions
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 try:
     stretch_audio("input.mp3", "output.wav", ratio=1.2)
@@ -230,7 +230,7 @@ except Exception as e:
 ```python
 import os
 from pathlib import Path
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 def safe_audio_stretch(input_path, output_path, **kwargs):
     """Safely stretch audio with comprehensive error handling"""
@@ -274,7 +274,7 @@ except Exception as e:
 ```python
 import os
 from pathlib import Path
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 def batch_stretch(input_dir, output_dir, ratio=1.0, **kwargs):
     """Process all audio files in a directory"""
@@ -477,7 +477,7 @@ def stretch_audio_view(request):
 import argparse
 import sys
 from pathlib import Path
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 def create_cli():
     """Create a custom CLI wrapper"""
@@ -542,7 +542,7 @@ if __name__ == '__main__':
 
 ```python
 import gc
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 def memory_efficient_processing(files, ratio=1.0):
     """Process files with explicit memory management"""

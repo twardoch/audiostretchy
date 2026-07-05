@@ -1,53 +1,51 @@
-# Temporary and binary files
+# Byte-compiled / optimized files
 *~
 *.py[cod]
-*.cfg
-!.isort.cfg
-!setup.cfg
+__pycache__/
 *.orig
 *.log
-*.pot
-__pycache__/*
-.cache/*
-.*.swp
-*/.ipynb_checkpoints/*
-.DS_Store
 
-# Project files
-.ropeproject
-.project
-.pydevproject
-.settings
-.idea
-.vscode
+# macOS / editor cruft
+.DS_Store
+.*.swp
+.idea/
+.vscode/
 tags
 
-# Package files
+# Packaging and build output
+build/
+dist/
+sdist/
 *.egg
 *.eggs/
+*.egg-info/
 .installed.cfg
-*.egg-info
-
-# Unittest and coverage
-htmlcov/*
-.coverage
-.coverage.*
-.tox
-junit*.xml
-coverage.xml
-.pytest_cache/
-
-# Build and docs folder/files
-#build/*
-#dist/*
-#sdist/*
-docs/api/*
-docs/_rst/*
-docs/_build/*
-cover/*
 MANIFEST
 
-# Per-project virtualenvs
+# Generated codebase snapshot
+llms.txt
+
+# Test / coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.pytest_cache/
+junit*.xml
+
+# Virtual environments (including the committed test_env/ that should never
+# have been tracked)
 .venv*/
+venv*/
+test_env/
 .conda*/
 .python-version
+
+# Documentation build scratch
+docs/_build/
+cover/
+
+# Note: prebuilt shared libraries under src/audiostretchy/interface/ and
+# src/audiostretchy/c_interface/lib/ are intentionally tracked — do not ignore
+# *.so / *.dylib / *.dll globally.

@@ -12,7 +12,6 @@ from .core import stretch_audio
 
 def main():
     """Main CLI entry point."""
-    fire.core.Display = lambda lines, out: print(*lines, file=out)
     fire.Fire(stretch_audio)
 
 

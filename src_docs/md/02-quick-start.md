@@ -59,7 +59,7 @@ audiostretchy large_file.wav output.wav --ratio 0.9 --fast_detection true
 The simplest approach using the `stretch_audio` function:
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 # Basic stretching
 stretch_audio("input.mp3", "output.wav", ratio=1.2)
@@ -79,7 +79,7 @@ stretch_audio(
 For more control and advanced workflows:
 
 ```python
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 # Initialize processor
 processor = AudioStretch()
@@ -91,7 +91,7 @@ processor.open("input.mp3")
 processor.stretch(ratio=1.1, upper_freq=350, lower_freq=60)
 
 # Optional: resample
-processor.resample(target_framerate=48000)
+processor.resample(48000)
 
 # Save result
 processor.save("output.wav")
@@ -168,7 +168,7 @@ Process multiple files:
 
 ```python
 import os
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 input_dir = "input_files"
 output_dir = "output_files"
@@ -235,7 +235,7 @@ processor.save("stretched_large.wav")
 Handle common issues gracefully:
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 try:
     stretch_audio("input.mp3", "output.wav", ratio=1.2)

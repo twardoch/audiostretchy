@@ -1,50 +1,18 @@
-# AudioStretchy Complete Rewrite - TODO
+# AudioStretchy - TODO
 
-## Completed ✅
+## Deferred / bigger ideas
 
-### Infrastructure Setup
-- [x] Set up git submodule for audio-stretch 
-- [x] Configure Hatch build system in pyproject.toml
-- [x] Create new project structure with src layout
-- [x] Remove old setuptools-based configuration
+### Packaging & platforms
+- [ ] **Windows support.** `c_interface/wrapper.py` looks for `interface/win/_stretch.dll`, but no DLL ships in `src/`. A stale `_stretch.dll` exists in the old committed `build/` tree; rebuild it cleanly from `audio-stretch` and add it, then restore the Windows classifier and CI leg.
+- [ ] **Real per-platform wheels via cibuildwheel.** Today the wheel is a fat `py3-none-any` bundling every platform's binary. Building tagged wheels (one binary each) would be smaller and more correct.
 
-### Core Implementation  
-- [x] Implement Pedalboard-based audio I/O in core.py
-- [x] Create C library compilation system in c_interface/build.py
-- [x] Develop ctypes wrapper for audio-stretch in c_interface/wrapper.py
-- [x] Implement main AudioStretch class with TDHS integration
-- [x] Update __init__.py and __main__.py for new structure
-- [x] Compile C library for current platform
+### Code consolidation
+- [ ] **Collapse the dual C-interface.** `interface/{mac,linux}/` holds the binaries actually loaded, while `c_interface/lib/_stretch_x64.so` is unused and `c_interface/build.py` writes to that unused path. Pick one layout: have `build.py` output to `interface/{platform}/`, drop `c_interface/lib/`, and remove `dummy.c`.
+- [ ] **Wire `gap_ratio` through.** Several `stretch_audio` parameters (`gap_ratio`, `buffer_ms`, `threshold_gap_db`, `normal_detection`) are documented as "currently unused"; either implement silence-aware stretching or remove them.
 
-### Build System
-- [x] Create local build scripts (scripts/build_local.py, scripts/compile_c.py)
-- [x] Set up GitHub Actions for cross-platform building (.github/workflows/build.yml)
-- [x] Configure automated PyPI publishing (.github/workflows/publish.yml)
-- [x] Configure cibuildwheel for cross-platform wheels
+### Testing
+- [ ] Add a clean-room install test (install the built wheel in a fresh venv, run a real stretch).
+- [ ] Add an end-to-end CLI smoke test (`audiostretchy in.wav out.wav --ratio 0.75`).
 
-### Testing Framework
-- [x] Create basic test suite for core functionality (tests/test_core.py)
-- [x] Test audio data conversion methods (float32 ⟷ int16)
-- [x] Test error handling for edge cases
-- [x] Remove old implementation files
-
-## Next Steps 📋
-
-### Testing & Validation
-- [ ] Test package build with `python -m build`
-- [ ] Verify wheel includes compiled C libraries
-- [ ] Test installation from wheel in clean environment  
-- [ ] Add integration tests with actual audio files
-- [ ] Test CLI functionality end-to-end
-
-### Documentation & Polish
-- [ ] Update README.md with new architecture details
-- [ ] Update CHANGELOG.md with rewrite information
-- [ ] Test cross-platform compatibility
-- [ ] Performance benchmarking vs old implementation
-
-### Release Preparation
-- [ ] Version bump and tagging
-- [ ] Test GitHub Actions workflows
-- [ ] Documentation review
-- [ ] Final validation of all functionality
+### Housekeeping
+- [ ] After the release tag lands, untrack the committed `build/`, `dist/`, `test_env/`, and `llms.txt` (now git-ignored) in a dedicated cleanup commit.

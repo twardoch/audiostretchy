@@ -1,6 +1,17 @@
 # AudioStretchy
 
+<p align="center">
+  <img src="docs/assets/icon.png" alt="AudioStretchy" width="180">
+</p>
+
 **AudioStretchy is a Python library and command-line interface (CLI) tool designed for high-quality time-stretching of audio files without altering their pitch.**
+
+```python
+from audiostretchy.core import stretch_audio
+
+# Make audio 25% shorter (faster) without changing pitch
+stretch_audio("input.wav", "output.wav", ratio=0.75)
+```
 
 It leverages David Bryant’s robust [audio-stretch C library](https://github.com/dbry/audio-stretch), which implements the Time-Domain Harmonic Scaling (TDHS) algorithm, particularly effective for speech. For versatile audio file handling (WAV, MP3, FLAC, OGG, etc.) and resampling, AudioStretchy integrates [Spotify's Pedalboard library](https://github.com/spotify/pedalboard).
 
@@ -141,7 +152,7 @@ AudioStretchy can be used programmatically within your Python scripts.
 The `stretch_audio` function provides a quick way to process files.
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 stretch_audio(
     input_path="path/to/your/input.mp3",
@@ -159,7 +170,7 @@ print("Audio stretching complete!")
 For more control, or if working with audio data in memory (e.g., from `BytesIO` objects), use the `AudioStretch` class.
 
 ```python
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 from io import BytesIO
 
 # Initialize the processor
@@ -177,7 +188,7 @@ processor.stretch(
 )
 
 # Optional: Resample the processed audio
-processor.resample(target_framerate=48000)
+processor.resample(48000)
 
 processor.save("processed_output.ogg") # Pedalboard infers format from extension
 # OR: processor.save("processed_output.custom", output_format="ogg")
@@ -217,7 +228,7 @@ AudioStretchy operates through several key stages:
 
 2.  **Core Time-Stretching (via `audio-stretch` C library & `TDHSAudioStretch` wrapper):**
     *   The raw audio samples (float32) obtained from `pedalboard` are converted to 16-bit integers (`int16`), as the C library expects this format. If the audio is stereo, channels are interleaved (L, R, L, R...).
-    *   The `TDHSAudioStretch` class in `src/audiostretchy/interface/tdhs.py` uses `ctypes` to call functions from the pre-compiled `audio-stretch` shared library (e.g., `_stretch.so`, `_stretch.dylib`, `_stretch.dll`).
+    *   The `TDHSAudioStretch` class in `src/audiostretchy/c_interface/wrapper.py` uses `ctypes` to call functions from the pre-compiled `audio-stretch` shared library (e.g., `_stretch.so`, `_stretch.dylib`, `_stretch.dll`).
     *   The C library implements **Time-Domain Harmonic Scaling (TDHS)**. This algorithm works by:
         *   Analyzing the input audio signal in the time domain.
         *   Identifying periodic segments (related to pitch) within the audio.
@@ -229,10 +240,10 @@ AudioStretchy operates through several key stages:
     *   After the C library processes the audio, the resulting `int16` samples are converted back to `float32` for `pedalboard` to handle.
 
 3.  **Python Orchestration (`AudioStretch` class):**
-    *   The `AudioStretch` class in `src/audiostretchy/stretch.py` manages the overall process:
-        *   Initializes and uses `PedalboardAudioFile` for I/O.
+    *   The `AudioStretch` class in `src/audiostretchy/core.py` manages the overall process:
+        *   Uses Pedalboard's `ReadableAudioFile`/`WriteableAudioFile` for I/O.
         *   Prepares data for the `TDHSAudioStretch` wrapper (data type conversion, interleaving).
-        *   Calls the `stretch` method of `TDHSAudioStretch`.
+        *   Calls the stretch method of `TDHSAudioStretch`.
         *   Handles data conversion back from the wrapper.
         *   Coordinates resampling if requested.
 
@@ -242,13 +253,13 @@ The `gap_ratio` parameter is intended for applying a different stretch ratio to 
 
 *   **`src/audiostretchy/__main__.py`:**
     *   Provides the command-line interface using the `fire` library.
-    *   It calls the `stretch_audio` function from `stretch.py`.
-*   **`src/audiostretchy/stretch.py`:**
+    *   It calls the `stretch_audio` function from `core.py`.
+*   **`src/audiostretchy/core.py`:**
     *   Contains the main `AudioStretch` class that orchestrates the audio processing.
     *   Implements methods for opening, stretching, resampling, and saving audio.
     *   Includes the `stretch_audio` convenience function used by the CLI.
-    *   Relies on `pedalboard` for I/O and resampling, and `TDHSAudioStretch` for the core algorithm.
-*   **`src/audiostretchy/interface/tdhs.py`:**
+    *   Uses Pedalboard's `ReadableAudioFile`/`WriteableAudioFile` for I/O and numpy for resampling, and `TDHSAudioStretch` for the core algorithm.
+*   **`src/audiostretchy/c_interface/wrapper.py`:**
     *   Defines the `TDHSAudioStretch` class, which is a Python `ctypes` wrapper around the pre-compiled `audio-stretch` C library.
     *   Loads the shared library (`.so`, `.dylib`, `.dll`) based on the operating system.
     *   Defines argument types and return types for the C functions (`stretch_init`, `stretch_samples`, `stretch_flush`, etc.).

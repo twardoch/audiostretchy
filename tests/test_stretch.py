@@ -1,9 +1,10 @@
-import pytest
 from pathlib import Path
+
 import numpy as np
+import pytest
 import soundfile  # Using soundfile for reliable audio properties comparison
 
-from audiostretchy.stretch import AudioStretch, stretch_audio
+from audiostretchy.core import AudioStretch, stretch_audio
 
 
 # Helper function to get audio properties
@@ -34,26 +35,23 @@ def test_open_wav(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
     # Get properties using soundfile for comparison
     sf_rate, sf_channels, sf_frames = get_audio_properties(sample_wav_path)
-    assert audio_processor.framerate == sf_rate
-    assert audio_processor.nchannels == sf_channels
-    assert audio_processor.in_samples is not None
+    assert audio_processor.samplerate == sf_rate
+    assert audio_processor.num_channels == sf_channels
     assert audio_processor.samples is not None
     # Samples are (channels, frames)
-    assert audio_processor.in_samples.shape == (sf_channels, sf_frames)
     assert audio_processor.samples.shape == (sf_channels, sf_frames)
-    assert audio_processor.in_samples.dtype == np.float32
+    assert audio_processor.samples.dtype == np.float32
 
 
 def test_open_mp3(audio_processor, sample_mp3_path):
     # This requires ffmpeg to be installed for pedalboard to read mp3s usually
     try:
         audio_processor.open(sample_mp3_path)
-        assert audio_processor.framerate > 0
-        assert audio_processor.nchannels > 0
-        assert audio_processor.in_samples is not None
+        assert audio_processor.samplerate > 0
+        assert audio_processor.num_channels > 0
         assert audio_processor.samples is not None
-        assert audio_processor.in_samples.dtype == np.float32
-    except IOError as e:
+        assert audio_processor.samples.dtype == np.float32
+    except OSError as e:
         pytest.skip(
             f"Skipping MP3 test, pedalboard couldn't open MP3 (possibly missing ffmpeg or backend): {e}"
         )
@@ -68,8 +66,8 @@ def test_save_wav(audio_processor, sample_wav_path, tmp_path):
 
     assert output_path.exists()
     rate, channels, frames = get_audio_properties(output_path)
-    assert rate == audio_processor.framerate
-    assert channels == audio_processor.nchannels
+    assert rate == audio_processor.samplerate
+    assert channels == audio_processor.num_channels
     # audio_processor.samples is (channels, frames)
     expected_frames = audio_processor.samples.shape[1]
     assert frames == expected_frames
@@ -80,13 +78,13 @@ def test_save_mp3(audio_processor, sample_wav_path, tmp_path):
     audio_processor.open(sample_wav_path)
     output_path = tmp_path / "output.mp3"
     try:
-        audio_processor.save(output_path, output_format="mp3")  # Specify format
+        audio_processor.save(output_path, format="mp3")  # Specify format
         assert output_path.exists()
         # Check basic properties. MP3 encoding can sometimes slightly alter frame counts or lead to skips.
         rate, channels, _ = get_audio_properties(output_path)
-        assert rate == audio_processor.framerate
-        assert channels == audio_processor.nchannels
-    except IOError as e:
+        assert rate == audio_processor.samplerate
+        assert channels == audio_processor.num_channels
+    except OSError as e:
         pytest.skip(
             f"Skipping MP3 save test, pedalboard couldn't save MP3 (possibly missing ffmpeg or backend): {e}"
         )
@@ -96,14 +94,14 @@ def test_save_mp3(audio_processor, sample_wav_path, tmp_path):
 
 def test_resample(audio_processor, sample_wav_path):
     audio_processor.open(sample_wav_path)
-    original_framerate = audio_processor.framerate
+    original_framerate = audio_processor.samplerate
     # audio_processor.samples is (channels, frames)
     original_frames = audio_processor.samples.shape[1]
     target_framerate = 22050
 
     audio_processor.resample(target_framerate)
 
-    assert audio_processor.framerate == target_framerate
+    assert audio_processor.samplerate == target_framerate
     # audio_processor.samples is still (channels, frames)
     current_frames = audio_processor.samples.shape[1]
     expected_frames = int(original_frames * (target_framerate / original_framerate))
@@ -115,10 +113,10 @@ def test_resample(audio_processor, sample_wav_path):
 def test_resample_noop(audio_processor, sample_wav_path):
     """Test that resampling to the same sample rate is a no-op."""
     audio_processor.open(sample_wav_path)
-    original_framerate = audio_processor.framerate
+    original_framerate = audio_processor.samplerate
     original_samples = audio_processor.samples.copy()
     audio_processor.resample(original_framerate)
-    assert audio_processor.framerate == original_framerate
+    assert audio_processor.samplerate == original_framerate
     # The samples should be unchanged
     assert audio_processor.samples.shape == original_samples.shape
     assert (audio_processor.samples == original_samples).all()
@@ -179,10 +177,8 @@ def test_stretch_various_params(
         effective_ratio = ratio_val
         # If not using double_range, ensure effective_ratio is within 0.5-2.0 for TDHS non-dual mode
         if not double_range_val:
-            if effective_ratio > 2.0:
-                effective_ratio = 2.0
-            if effective_ratio < 0.5:
-                effective_ratio = 0.5
+            effective_ratio = min(effective_ratio, 2.0)
+            effective_ratio = max(effective_ratio, 0.5)
 
     audio_processor.stretch(
         ratio=effective_ratio,
@@ -253,22 +249,22 @@ def test_open_wav_filelike(audio_processor, sample_wav_path):
 
     audio_processor.open(file=file_like_object)
 
-    assert audio_processor.framerate == sf_rate
-    assert audio_processor.nchannels == sf_channels
-    assert audio_processor.in_samples.shape == (sf_channels, sf_frames)
+    assert audio_processor.samplerate == sf_rate
+    assert audio_processor.num_channels == sf_channels
+    assert audio_processor.samples.shape == (sf_channels, sf_frames)
 
 
 def test_save_wav_filelike(audio_processor, sample_wav_path, tmp_path):
     audio_processor.open(sample_wav_path)
     original_samples = audio_processor.samples.copy()
-    original_framerate = audio_processor.framerate
-    original_nchannels = audio_processor.nchannels
+    original_framerate = audio_processor.samplerate
+    original_nchannels = audio_processor.num_channels
 
     import io
 
     file_like_object = io.BytesIO()
 
-    audio_processor.save(file=file_like_object, output_format="wav")
+    audio_processor.save(file=file_like_object, format="wav")
 
     file_like_object.seek(0)  # Rewind to read
 
@@ -335,7 +331,7 @@ def test_stretch_audio_func_mp3_to_mp3(sample_mp3_path, tmp_path):
                 abs(out_frames - expected_frames) < in_frames * 0.10
             )  # 10% leeway for MP3
 
-    except IOError as e:
+    except OSError as e:
         pytest.skip(
             f"Skipping MP3 integration test, pedalboard operation failed (possibly missing ffmpeg or backend): {e}"
         )
@@ -444,7 +440,6 @@ def test_stretch_audio_func_stretch_and_resample(sample_wav_path, tmp_path):
 # in `test_open_wav` rather than hardcoding 44100, but for provided test files it's likely okay.
 # Let's assume `tests/audio.wav` is 44.1kHz stereo for now.
 # The `get_audio_properties` from `soundfile` will tell the truth.
-# The initial assertion `assert audio_processor.framerate == 44100` in `test_open_wav`
+# The initial assertion `assert audio_processor.samplerate == 44100` in `test_open_wav`
 # should ideally be compared against `get_audio_properties(sample_wav_path)[0]`.
 # Let's make that small adjustment.
-pass

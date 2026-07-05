@@ -256,7 +256,7 @@ Test your installation:
 audiostretchy --help
 
 # Test Python import
-python -c "from audiostretchy.stretch import stretch_audio; print('Success!')"
+python -c "from audiostretchy import stretch_audio; print('Success!')"
 
 # Test with sample file (if you have audio files)
 audiostretchy input.wav output.wav --ratio 1.1

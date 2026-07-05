@@ -19,7 +19,7 @@ graph TB
     
     subgraph "Python Layer"
         MAIN[__main__.py]
-        STRETCH[stretch.py]
+        STRETCH[core.py]
         CORE[core.py]
     end
     
@@ -73,7 +73,7 @@ CLI entry point using Fire library
 """
 
 import fire
-from .stretch import stretch_audio
+from .core import stretch_audio
 
 def main():
     """CLI entry point"""
@@ -88,12 +88,12 @@ if __name__ == "__main__":
 - Minimal code, maximum functionality
 - All parameters automatically exposed as CLI options
 
-#### `src/audiostretchy/stretch.py`
+#### `src/audiostretchy/core.py`
 
 **Purpose**: Main orchestration and public API
 
 ```python
-# this_file: src/audiostretchy/stretch.py
+# this_file: src/audiostretchy/core.py
 """
 Core AudioStretch class and convenience functions
 - File I/O management via Pedalboard
@@ -116,8 +116,8 @@ class AudioStretch:
     def stretch(self, ratio=1.0, **params):
         """Apply TDHS time-stretching"""
         
-    def resample(self, target_framerate):
-        """Resample audio using Pedalboard"""
+    def resample(self, target_samplerate):
+        """Resample audio using numpy linear interpolation"""
         
     def save(self, file_path_or_object, format=None):
         """Save processed audio"""
@@ -144,18 +144,18 @@ Currently minimal - may expand for shared utilities
 """
 
 # Re-exports for internal use
-from .interface.tdhs import TDHSAudioStretch
-from .stretch import AudioStretch, stretch_audio
+from .c_interface import TDHSAudioStretch
+from .core import AudioStretch, stretch_audio
 ```
 
 ### Interface Layer
 
-#### `src/audiostretchy/interface/tdhs.py`
+#### `src/audiostretchy/c_interface/wrapper.py`
 
 **Purpose**: Python-C interface using ctypes
 
 ```python
-# this_file: src/audiostretchy/interface/tdhs.py
+# this_file: src/audiostretchy/c_interface/wrapper.py
 """
 TDHS C library wrapper
 - Platform detection and library loading

@@ -153,7 +153,7 @@ All new code should include tests:
 ```python
 # tests/test_stretch.py
 import pytest
-from audiostretchy.stretch import AudioStretch, stretch_audio
+from audiostretchy import AudioStretch, stretch_audio
 
 def test_ratio_validation():
     """Test ratio parameter validation."""
@@ -415,7 +415,7 @@ def stretch_audio(
 # Example profiling script
 import cProfile
 import pstats
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 def profile_stretching():
     """Profile audio stretching performance."""
@@ -514,7 +514,7 @@ cp _stretch.so ../../src/audiostretchy/interface/linux/
 
 ```python
 # Test C library changes
-from audiostretchy.interface.tdhs import TDHSAudioStretch
+from audiostretchy.c_interface import TDHSAudioStretch
 
 def test_c_library():
     """Test C library functionality."""

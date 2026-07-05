@@ -57,7 +57,7 @@ def stretch_audio(
 **Example:**
 
 ```python
-from audiostretchy.stretch import stretch_audio
+from audiostretchy import stretch_audio
 
 # Basic usage
 stretch_audio("input.mp3", "output.wav", ratio=1.2)
@@ -100,7 +100,7 @@ Creates a new AudioStretch instance.
 **Example:**
 
 ```python
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 processor = AudioStretch()
 ```
@@ -178,14 +178,14 @@ processor.stretch(ratio=1.3, upper_freq=350)
 ##### `resample()`
 
 ```python
-def resample(self, target_framerate: int) -> None
+def resample(self, target_samplerate: int) -> None
 ```
 
 Resample the audio to a different sample rate.
 
 **Parameters:**
 
-- `target_framerate`: Target sample rate in Hz
+- `target_samplerate`: Target sample rate in Hz
 
 **Raises:**
 
@@ -195,7 +195,7 @@ Resample the audio to a different sample rate.
 **Example:**
 
 ```python
-processor.resample(target_framerate=48000)
+processor.resample(48000)
 ```
 
 ##### `save()`
@@ -263,7 +263,7 @@ Number of audio channels.
 #### Complete Example
 
 ```python
-from audiostretchy.stretch import AudioStretch
+from audiostretchy import AudioStretch
 
 # Initialize processor
 processor = AudioStretch()
@@ -282,7 +282,7 @@ try:
     )
     
     # Optional resampling
-    processor.resample(target_framerate=44100)
+    processor.resample(44100)
     
     # Save result
     processor.save("output.wav")
@@ -375,7 +375,7 @@ Clean up processing context and free memory.
 **Example:**
 
 ```python
-from audiostretchy.interface.tdhs import TDHSAudioStretch
+from audiostretchy.c_interface import TDHSAudioStretch
 import numpy as np
 
 # Low-level usage (advanced)
@@ -435,7 +435,7 @@ class ProcessingError(RuntimeError):
 
 ## Module Structure
 
-### `audiostretchy.stretch`
+### `audiostretchy.core`
 
 Main module containing user-facing classes and functions.
 
@@ -443,7 +443,7 @@ Main module containing user-facing classes and functions.
 - `AudioStretch` class
 - `stretch_audio()` function
 
-### `audiostretchy.interface.tdhs`
+### `audiostretchy.c_interface`
 
 Low-level TDHS C library interface.
 

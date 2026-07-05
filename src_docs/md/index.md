@@ -65,18 +65,18 @@ AudioStretchy provides high-quality audio time-stretching without pitch changes 
 === "Python"
 
     ```python
-    from audiostretchy.stretch import stretch_audio
+    from audiostretchy import stretch_audio
     
     # Simple stretching
     stretch_audio("input.mp3", "output.wav", ratio=1.2)
     
     # Advanced usage with class
-    from audiostretchy.stretch import AudioStretch
+    from audiostretchy import AudioStretch
     
     processor = AudioStretch()
     processor.open("input.flac")
     processor.stretch(ratio=0.8, upper_freq=350)
-    processor.resample(target_framerate=48000)
+    processor.resample(48000)
     processor.save("output.wav")
     ```
 
