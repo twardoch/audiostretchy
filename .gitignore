@@ -49,3 +49,6 @@ cover/
 # Note: prebuilt shared libraries under src/audiostretchy/interface/ and
 # src/audiostretchy/c_interface/lib/ are intentionally tracked — do not ignore
 # *.so / *.dylib / *.dll globally.
+.trunk/
+vendors/stretch/samples/
+*.pyc
