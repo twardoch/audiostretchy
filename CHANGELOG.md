@@ -5,6 +5,16 @@ this_file: CHANGELOG.md
 
 ## [1.3.14] - 2026-11-03
 
+- Make GitHub Actions the sole `uv publish` caller; local publish.sh waits for success and verifies release assets without requiring local PyPI credentials or racing index propagation.
+
+## [1.3.13] - 2026-11-03
+
+- Preserve upstream LF source bytes on Windows.
+- Include uv.lock and Makefile so source archives can run the frozen test workflow without Git.
+- Add explicit PyPI checks for repeat uploads, and make documentation deployment opt-in while Pages is disabled.
+
+## [1.3.12] - 2026-11-03
+
 - Bundle upstream audio-stretch commit 0c8a4b8fc5ab569fa398f0f423e7cfe05be00efc and its license; no submodules or network needed for source builds.
 - Compile a fresh library during Hatch wheel/editable builds and ship Python-independent platform tags, with one binary per wheel.
 - Consolidate the native builder and legacy ctypes import; remove stale binaries and dummy extension.

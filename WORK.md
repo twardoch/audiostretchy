@@ -1,33 +1,32 @@
 ---
 this_file: WORK.md
 ---
-# Release modernization — 2026-11-03
+# Verified release: v1.3.14 — 2026-11-03
 
-Implemented the bundled upstream snapshot, shared native compiler, Hatch wheel hook, platform tags, five-platform GitHub Actions builds, hatch-vcs versioning, and uv-based release script using gitnextver 1.0.4.
+All requested release work is complete.
 
-Verification before release:
-- Baseline: 55 existing tests passed.
-- New tests reproduced missing-submodule build and invalid native input problems before fixes.
-- ./test.sh: 64 passed; 88% coverage; Ruff lint and format checks passed.
-- ./publish.sh --check: tests, sdist-to-wheel build, and strict Twine metadata checks passed.
-- actionlint, shellcheck, and git diff --check passed.
-- Distribution audit: one platform library per wheel; bundled sources byte-identical to the pinned upstream snapshot; sdist has source/build hook and no prebuilt libraries.
-- Isolated installed macOS ARM wheel: real 0.9-ratio TDHS processing produced 39,689 samples from 44,100 input samples.
-- macOS binary deployment target verified as 11.0; relocatable install name configured.
+- Upstream HEAD verified as `0c8a4b8fc5ab569fa398f0f423e7cfe05be00efc`; bundled C sources, header, CLI source, README, license and provenance. Windows checkouts preserve upstream LF bytes too.
+- One shared builder compiles TDHS during Hatch wheel/editable builds. No submodule/download requirement, stale prebuilt libraries, or dummy extension remains in distributions.
+- Five platform wheels built and tested: Linux x86_64/aarch64, macOS x86_64/arm64, Windows x86_64. Each contains one native library, correct platform metadata, and the exact upstream source.
+- `hatch-vcs` supplies versions. `./publish.sh` used gitnextver 1.0.4 to tag/push v1.3.14, waited for GitHub Actions' `uv publish`, downloaded all six release assets, passed strict Twine checks, and exited 0. Local PyPI credentials are unnecessary.
+- All six published PyPI SHA256 values match the downloaded release artifacts. Metadata and payload checks passed. Source archive includes the build hook, lockfile and Makefile, and no prebuilt binaries or private work log.
+- Existing Python 3.13 system installation upgraded to v1.3.14 from its published PyPI wheel with SHA256 verification. Active CLI tested from outside the checkout: 0.90000774 duration ratio on a WAV test.
+- Requested MP3 conversion ran immediately with ratio=0.9. Output decodes at 48 kHz stereo: ffprobe duration 9.116646 s; frame-padded duration 9.144 s. Original decoded input was 10.128 s. Audio was not manually auditioned.
 
-Pending live acceptance: GitHub's five native builds and Python endpoint tests, tag publication to PyPI, installation from PyPI on the user's machine, and requested MP3 conversion/duration measurement.
+## Verification
 
-Unrelated pre-existing src_docs/build.sh is preserved and excluded locally through .git/info/exclude; gitnextver requires no visible untracked files. Legacy local submodule directories remain ignored; releases contain only the new source snapshot.
+- Baseline: 55 existing tests passed before edits.
+- Final ./test.sh: 64 passed, 88% branch-aware coverage; Ruff lint/format clean.
+- Final source archive: ./test.sh passed all 64 tests without a Git checkout (89% statement coverage).
+- Python 3.10 and 3.14 CI passed on Linux, macOS and Windows.
+- Release workflow: all five wheel jobs, sdist job, metadata checks and PyPI publishing passed.
+- actionlint, shellcheck and git diff --check passed.
+- Documentation build passed. Deployment is opt-in through DEPLOY_DOCS=true after GitHub Pages is enabled.
 
-First live release v1.3.9: setup-uv has no v10 alias; switched to verified v10.3.3. No PyPI upload occurred. CI builds wheels on PR/manual runs and releases to avoid duplicate wheel builds for the branch and tag push.
+Evidence: https://github.com/twardoch/audiostretchy/actions/runs/41573621840 and https://github.com/twardoch/audiostretchy/releases/tag/v1.3.14
 
-Installed-wheel CI exposed cwd-relative legacy test fixtures (fixed to use __file__) and MSVC environment setup missing in the reusable wheel job (added). These failures occurred before any upload.
+## Release recovery notes
 
-v1.3.10: four Unix platform wheels passed installed tests. Windows compiled/loaded and passed 63 project tests, but POSIX-only empty-argument quoting also collected cibuildwheel's intentional failure fixture. Switched to cross-platform `-o addopts=`. All six Python endpoint CI jobs passed. No upload occurred.
-v1.3.11 was accidentally started before that config edit was applied; cancelled the redundant run. The corrected release will be v1.3.12.
+v1.3.9 exposed the missing setup-uv major alias, cwd-relative legacy fixtures, and missing MSVC environment. v1.3.10 exposed Windows shell quoting; redundant v1.3.11 was cancelled. None uploaded. v1.3.12 was published after repairing an expired GitHub token using local credentials without printing/storing values. v1.3.13 included source-archive/line-ending fixes. v1.3.14 removed redundant local upload to avoid PyPI index-propagation races; GitHub Actions owns publishing.
 
-Live acceptance for v1.3.12 passed: all five platform wheels and six Python endpoint jobs green; strict Twine checks; all six PyPI SHA256 values match downloaded CI artifacts. Published with local credentials without logging values and repaired the GitHub publishing secret. Failed-job rerun succeeded. Installed release into the existing Python 3.13 environment; active CLI produced a 0.90000774 duration ratio on a WAV smoke test. Requested MP3 output was produced immediately using the same source; decodes at 48 kHz stereo, 9.144 s including MP3 frame padding (ffprobe reports 9.116646 s). Original decoded input was 10.128 s.
-
-Final release fixes: explicit --check-url makes local resume skip exact existing files without credentials (verified live); include uv.lock/Makefile in source archives; enforce upstream LF line endings in Windows checkouts. Pages was disabled (404), so its deployment job now requires DEPLOY_DOCS=true; documentation builds remain enabled. Final release will be v1.3.13.
-
-v1.3.13: all five platform builds, six endpoint CI jobs, source-archive tests and GitHub publishing passed. The redundant local upload raced PyPI index propagation and requested credentials, so removed that upload entirely. GitHub Actions is now the sole uv publish caller; publish.sh waits for its success and downloads/checks the artifacts. Final version: v1.3.14.
+Pre-existing src_docs/build.sh is preserved and locally excluded through .git/info/exclude. Legacy local submodule directories are ignored and are not shipped.
