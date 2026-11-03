@@ -18,7 +18,7 @@ if [[ "${1:-}" == "--resume" ]]; then
     tag="${2:?Provide the existing release tag}"
 else
     [[ "$(git branch --show-current)" == main ]] || { echo "Release from main" >&2; exit 1; }
-    [[ -z "$(git status --porcelain --untracked-files=no)" ]] || { echo "Commit changes first" >&2; exit 1; }
+    [[ -z "$(git status --porcelain)" ]] || { echo "Commit changes first" >&2; exit 1; }
     ./test.sh
     git fetch origin main --tags
     git merge-base --is-ancestor origin/main HEAD
