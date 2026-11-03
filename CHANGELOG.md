@@ -3,7 +3,7 @@ this_file: CHANGELOG.md
 ---
 # Changelog
 
-## [1.3.13] - 2026-11-03
+## [1.3.14] - 2026-11-03
 
 - Bundle upstream audio-stretch commit 0c8a4b8fc5ab569fa398f0f423e7cfe05be00efc and its license; no submodules or network needed for source builds.
 - Compile a fresh library during Hatch wheel/editable builds and ship Python-independent platform tags, with one binary per wheel.

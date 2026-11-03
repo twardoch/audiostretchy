@@ -1,5 +1,5 @@
 # this_file: tests/test_release.py
-"""A resumed release must upload only its downloaded artifacts, without tagging."""
+"""A resumed release verifies exact artifacts without retagging or re-uploading."""
 
 import os
 import shutil
@@ -10,7 +10,7 @@ import pytest
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX release entry point")
-def test_resume_uploads_exact_release_files_without_new_tag(tmp_path):
+def test_resume_verifies_exact_release_files_without_new_tag(tmp_path):
     root = Path(__file__).resolve().parents[1]
     shutil.copy(root / "publish.sh", tmp_path / "publish.sh")
     binaries = tmp_path / "bin"
@@ -23,7 +23,6 @@ def test_resume_uploads_exact_release_files_without_new_tag(tmp_path):
 esac
 """,
         "uvx": "",
-        "uv": "",
         "git": "exit 99",
     }.items():
         executable = binaries / name
@@ -49,7 +48,9 @@ esac
     commands = log.read_text()
     assert "git " not in commands and "gitnextver" not in commands
     assert (
-        "uv publish --check-url https://pypi.org/simple/ dist/v1.3.9/release.tar.gz dist/v1.3.9/release.whl"
+        "uvx twine check --strict dist/v1.3.9/release.tar.gz dist/v1.3.9/release.whl"
         in commands
     )
+    assert "uv publish" not in commands
+    assert "Published v1.3.9" in result.stdout
     assert "stale.whl" not in commands

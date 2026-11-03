@@ -82,18 +82,18 @@ After committing your changes on `main`:
 ./publish.sh --check     # tests + local builds + metadata checks; no release
 ./publish.sh             # auto patch version, push, CI builds, uv publish
 ./publish.sh minor       # choose a minor or major bump when appropriate
-./publish.sh --resume v1.3.13  # resume the same release after fixing an external failure
+./publish.sh --resume v1.3.14  # resume the same release after fixing an external failure
 ```
 
 The release command uses `uvx gitnextver` to create and atomically push the tag
 and branch, waits for the Release workflow, downloads its exact artifacts, and
-runs `uv publish`. GitHub Actions builds and tests all five platform wheels,
+checks their metadata. GitHub Actions builds and tests all five platform wheels,
 checks metadata, publishes with `uv publish`, and attaches the same files to the
 GitHub release. Re-running upload is safe for identical files. It never silently
 creates a new version when resuming a failed release.
 
-Local prerequisites: `uv`, authenticated `gh`, Git push access, and PyPI upload
-credentials if local upload is needed (`UV_PUBLISH_TOKEN`). GitHub uses the
+Local prerequisites: `uv`, authenticated `gh`, and Git push access.
+GitHub runs `uv publish` and uses the
 repository secret `PYPI_TOKEN`; without it, configure a PyPI trusted publisher
 for `release.yml`. Token values must stay out of files and command arguments.
 
