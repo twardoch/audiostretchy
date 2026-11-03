@@ -18,3 +18,5 @@ Verification before release:
 Pending live acceptance: GitHub's five native builds and Python endpoint tests, tag publication to PyPI, installation from PyPI on the user's machine, and requested MP3 conversion/duration measurement.
 
 Unrelated pre-existing src_docs/build.sh is preserved and excluded locally through .git/info/exclude; gitnextver requires no visible untracked files. Legacy local submodule directories remain ignored; releases contain only the new source snapshot.
+
+First live release v1.3.9: setup-uv has no v10 alias; switched to verified v10.3.3. No PyPI upload occurred. CI builds wheels on PR/manual runs and releases to avoid duplicate wheel builds for the branch and tag push.

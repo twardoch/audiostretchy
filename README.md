@@ -82,7 +82,7 @@ After committing your changes on `main`:
 ./publish.sh --check     # tests + local builds + metadata checks; no release
 ./publish.sh             # auto patch version, push, CI builds, uv publish
 ./publish.sh minor       # choose a minor or major bump when appropriate
-./publish.sh --resume v1.3.9  # resume the same release after fixing an external failure
+./publish.sh --resume v1.3.10  # resume the same release after fixing an external failure
 ```
 
 The release command uses `uvx gitnextver` to create and atomically push the tag
@@ -98,7 +98,7 @@ repository secret `PYPI_TOKEN`; without it, configure a PyPI trusted publisher
 for `release.yml`. Token values must stay out of files and command arguments.
 
 The CI workflow also tests Python 3.10 and 3.14 on Linux, macOS and Windows and
-builds the same five wheels on branch pushes and pull requests.
+builds the same five wheels on pull requests and manual runs.
 
 ## License
 
