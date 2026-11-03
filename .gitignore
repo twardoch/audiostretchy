@@ -46,9 +46,11 @@ test_env/
 docs/_build/
 cover/
 
-# Note: prebuilt shared libraries under src/audiostretchy/interface/ and
-# src/audiostretchy/c_interface/lib/ are intentionally tracked — do not ignore
-# *.so / *.dylib / *.dll globally.
+# Native libraries are built locally and inside wheels, never committed.
+src/audiostretchy/c_interface/lib/
+.codegraph/
+.ruff_cache/
+# Superseded local submodule checkouts; distributions use the bundled snapshot.
+/audio-stretch/
+/vendors/
 .trunk/
-vendors/stretch/samples/
-*.pyc

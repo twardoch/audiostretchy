@@ -32,6 +32,11 @@ class TDHSAudioStretch:
             num_chans: Number of audio channels (1 or 2)
             flags: Algorithm behavior flags (STRETCH_FAST_FLAG, STRETCH_DUAL_FLAG)
         """
+        self.handle = None
+        if not 24 <= shortest_period < longest_period <= 2400:
+            raise ValueError("Invalid pitch detection periods")
+        if num_chans not in (1, 2):
+            raise ValueError("Channel count must be 1 or 2")
         self._lib = self._load_library()
         self._setup_function_signatures()
 
@@ -42,22 +47,12 @@ class TDHSAudioStretch:
             raise RuntimeError("Failed to initialize audio stretch context")
 
     def _load_library(self) -> ctypes.CDLL:
-        """Load the appropriate shared library for the current platform.
-
-        Prebuilt libraries ship in ``src/audiostretchy/interface/{platform}/``:
-        ``mac/_stretch.dylib``, ``linux/_stretch.so`` and ``win/_stretch.dll``.
-        """
+        """Load the single library compiled for this wheel's platform."""
         system = platform.system()
-        # Canonical paths match the bundled layout in interface/
-        interface_dir = Path(__file__).parent.parent / "interface"
-        if system == "Windows":
-            lib_path = interface_dir / "win" / "_stretch.dll"
-        elif system == "Darwin":
-            lib_path = interface_dir / "mac" / "_stretch.dylib"
-        elif system == "Linux":
-            lib_path = interface_dir / "linux" / "_stretch.so"
-        else:
+        extensions = {"Windows": ".dll", "Darwin": ".dylib", "Linux": ".so"}
+        if system not in extensions:
             raise RuntimeError(f"Unsupported platform: {system}")
+        lib_path = Path(__file__).parent / "lib" / ("_stretch" + extensions[system])
 
         if not lib_path.exists():
             raise RuntimeError(f"Audio stretch library not found at {lib_path}")

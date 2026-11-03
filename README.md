@@ -1,384 +1,108 @@
+---
+this_file: README.md
+---
 # AudioStretchy
 
-<p align="center">
-  <img src="docs/assets/icon.png" alt="AudioStretchy" width="180">
-</p>
+Change audio duration without changing pitch, using David Bryant's
+[audio-stretch](https://github.com/dbry/audio-stretch) TDHS engine.
+Pedalboard reads and writes WAV, MP3, FLAC, OGG and AIFF; NumPy handles samples
+and linear-interpolation resampling.
 
-**AudioStretchy is a Python library and command-line interface (CLI) tool designed for high-quality time-stretching of audio files without altering their pitch.**
+```sh
+uv tool install audiostretchy
+# 10% shorter, at the same pitch:
+audiostretchy input.mp3 output.mp3 --ratio 0.9
+```
+
+For a Python project, use `uv add audiostretchy`:
 
 ```python
-from audiostretchy.core import stretch_audio
+from audiostretchy import AudioStretch, stretch_audio
 
-# Make audio 25% shorter (faster) without changing pitch
-stretch_audio("input.wav", "output.wav", ratio=0.75)
-```
+stretch_audio("input.wav", "output.wav", ratio=0.9)
 
-It leverages David Bryant’s robust [audio-stretch C library](https://github.com/dbry/audio-stretch), which implements the Time-Domain Harmonic Scaling (TDHS) algorithm, particularly effective for speech. For versatile audio file handling (WAV, MP3, FLAC, OGG, etc.) and resampling, AudioStretchy integrates [Spotify's Pedalboard library](https://github.com/spotify/pedalboard).
-
-## Table of Contents
-
-- [Who is this for?](#who-is-this-for)
-- [Why is it useful?](#why-is-it-useful)
-- [Features](#features)
-- [Demo](#demo)
-- [Installation](#installation)
-    - [Standard Installation](#standard-installation)
-    - [Development Installation](#development-installation)
-- [Usage](#usage)
-    - [Command-Line Interface (CLI)](#command-line-interface-cli)
-    - [Python API](#python-api)
-- [Technical Details](#technical-details)
-    - [How it Works](#how-it-works)
-    - [Core Modules](#core-modules)
-    - [Coding Conventions](#coding-conventions)
-    - [Contributing](#contributing)
-- [License](#license)
-
-## Who is this for?
-
-AudioStretchy is aimed at:
-
-*   **Musicians and Music Producers:** To adjust the tempo of backing tracks, samples, or entire songs.
-*   **Audio Engineers:** For post-production tasks requiring timing adjustments without pitch artifacts.
-*   **Podcast and Video Editors:** To fit voiceovers or audio segments into specific time slots.
-*   **Software Developers:** Who need to integrate audio time-stretching capabilities into their Python applications.
-*   **Researchers and Hobbyists:** Exploring audio processing techniques.
-
-## Why is it useful?
-
-Time-stretching audio without affecting pitch is a common need in audio production. AudioStretchy provides:
-
-*   **High-Quality Results:** The TDHS algorithm is known for producing natural-sounding results, especially with speech.
-*   **Ease of Use:** Simple CLI and Python API make it accessible for various workflows.
-*   **Format Flexibility:** Supports a wide range of common audio formats thanks to Pedalboard.
-*   **Cross-Platform Compatibility:** Works on Windows, macOS, and Linux.
-
-## Features
-
-*   **High-Quality Time Stretching**: Utilizes David Bryant's `audio-stretch` C library (TDHS algorithm).
-*   **Silence-Aware Stretching**: Supports separate stretching ratios for gaps/silence via the `gap_ratio` parameter (Note: The Python wrapper currently passes this to the C library; however, effective silence-specific stretching relies on the C library's internal segmentation or future Python-side pre-segmentation logic).
-*   **Broad Audio Format Support**: Reads and writes numerous audio formats (WAV, MP3, FLAC, OGG, AIFF, etc.) using the Pedalboard library.
-*   **Resampling**: Supports audio resampling, also via Pedalboard.
-*   **Adjustable Parameters**: Fine-tune stretching with parameters like frequency limits for period detection, buffer sizes, and silence thresholds.
-*   **Cross-Platform**: Includes pre-compiled C libraries for Windows, macOS (x86_64, arm64), and Linux.
-*   **Simple CLI and Python API**.
-
-## Demo
-
-Below are links to a short audio file (as WAV and MP3), with the same file stretched at a ratio of 1.2 (making it 20% slower):
-
-| Input                                                                             | Stretched (Ratio 1.2)                                                                     |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [`audio.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.wav) | [`audio-1.2.wav`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.wav) |
-| [`audio.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio.mp3) | [`audio-1.2.mp3`](https://github.com/twardoch/audiostretchy/raw/main/tests/audio-1.2.mp3) |
-
-## Installation
-
-### Standard Installation
-
-AudioStretchy includes a C extension that provides the core TDHS algorithm. Pre-compiled wheels are provided for Windows, macOS, and Linux, making installation straightforward via pip:
-
-```bash
-python3 -m pip install audiostretchy
-```
-
-This command installs `audiostretchy` along with its key dependencies:
-*   `numpy`: For numerical operations.
-*   `pedalboard`: For reading/writing various audio formats and for resampling.
-*   `fire`: For the command-line interface.
-
-**Note on Pedalboard Dependencies (FFmpeg):**
-For `pedalboard` to support a wide range of audio formats (especially compressed ones like MP3, M4A, OGG), it relies on system libraries like FFmpeg. If you encounter issues opening or saving specific file types, ensure FFmpeg is installed and accessible in your system's PATH.
-
-*   **macOS (using Homebrew):** `brew install ffmpeg`
-*   **Linux (Debian/Ubuntu):** `sudo apt-get install ffmpeg`
-*   **Windows:** Download FFmpeg from the [official website](https://ffmpeg.org/download.html), extract it, and add its `bin` directory to your system's PATH environment variable.
-
-### Development Installation
-
-To install the development version from the repository for contributing or testing:
-
-```bash
-git clone https://github.com/twardoch/audiostretchy.git
-cd audiostretchy
-git submodule update --init --recursive # To fetch the audio-stretch C library source
-python3 -m pip install -e .[testing] # Installs in editable mode with testing dependencies
-```
-
-If you modify the C code in `vendors/stretch/stretch.c`, you will need to recompile the C library. This typically involves:
-1.  Having a C compiler installed (GCC/Clang on Linux/macOS, MSVC on Windows).
-2.  Manually compiling `vendors/stretch/stretch.c` into the appropriate shared library format (`_stretch.so` on Linux, `_stretch.dylib` on macOS, `_stretch.dll` on Windows).
-3.  Placing the compiled library into the correct directory within `src/audiostretchy/interface/` (e.g., `src/audiostretchy/interface/linux/`).
-The CI workflow (`.github/workflows/ci.yaml`) handles this for official releases.
-
-## Usage
-
-### Command-Line Interface (CLI)
-
-The `audiostretchy` command allows you to stretch audio files directly from your terminal.
-
-**Syntax:**
-```bash
-audiostretchy INPUT_FILE OUTPUT_FILE [FLAGS]
-```
-
-**Positional Arguments:**
-*   `INPUT_FILE`: Path to the input audio file (e.g., `input.wav`, `song.mp3`).
-*   `OUTPUT_FILE`: Path to save the processed audio file (e.g., `output_stretched.wav`).
-
-**Optional Flags (TDHS Parameters):**
-*   `-r, --ratio=FLOAT`: The stretch ratio. Values > 1.0 extend audio (slower playback), < 1.0 shorten audio (faster playback). Default: `1.0` (no change).
-*   `-g, --gap_ratio=FLOAT`: Stretch ratio specifically for silence or gaps in the audio. Default: `0.0` (which means use the main `ratio` for gaps). *Note: The underlying C library may use this if it performs internal silence detection, but the Python wrapper does not currently implement pre-segmentation based on this.*
-*   `-u, --upper_freq=INT`: Upper frequency limit for period detection in Hz. Affects how the algorithm identifies fundamental frequencies. Default: `333`.
-*   `-l, --lower_freq=INT`: Lower frequency limit for period detection in Hz. Default: `55`.
-*   `-b, --buffer_ms=FLOAT`: Buffer size in milliseconds, potentially for silence detection logic. Default: `25`. *(Note: Primarily relevant if advanced gap handling is implemented/utilized).*
-*   `-t, --threshold_gap_db=FLOAT`: Silence threshold in dB for gap detection. Default: `-40`. *(Note: Primarily relevant if advanced gap handling is implemented/utilized).*
-*   `-d, --double_range=BOOL`: Use an extended ratio range (0.25-4.0 instead of the default 0.5-2.0). Set to `True` or `False`. Default: `False`.
-*   `-f, --fast_detection=BOOL`: Enable a faster (but potentially lower quality) period detection method. Set to `True` or `False`. Default: `False`.
-*   `-n, --normal_detection=BOOL`: Force normal period detection (this can override fast detection if the sample rate is high, depending on C library logic). Set to `True` or `False`. Default: `False`.
-*   `-s, --sample_rate=INT`: Target sample rate in Hz for resampling the output. If `0` or omitted, the output will have the same sample rate as the input (unless stretching itself inherently changes it, which TDHS does not aim to do for sample rate). Default: `0` (no resampling).
-
-**Example:**
-To make `input.mp3` 20% slower and save it as `output_slow.wav` with a 44100 Hz sample rate:
-```bash
-audiostretchy input.mp3 output_slow.wav --ratio 1.2 --sample_rate 44100
-```
-
-### Python API
-
-AudioStretchy can be used programmatically within your Python scripts.
-
-**Simple Function Call:**
-The `stretch_audio` function provides a quick way to process files.
-
-```python
-from audiostretchy import stretch_audio
-
-stretch_audio(
-    input_path="path/to/your/input.mp3",
-    output_path="path/to/your/output_stretched.wav",
-    ratio=0.8,  # Make audio 20% faster
-    sample_rate=22050, # Resample output to 22050 Hz
-    upper_freq=300, # Adjust upper frequency for period detection
-    fast_detection=True # Use faster algorithm
-)
-
-print("Audio stretching complete!")
-```
-
-**Using the `AudioStretch` Class:**
-For more control, or if working with audio data in memory (e.g., from `BytesIO` objects), use the `AudioStretch` class.
-
-```python
-from audiostretchy import AudioStretch
-from io import BytesIO
-
-# Initialize the processor
 processor = AudioStretch()
-
-# --- Example 1: Processing files ---
-processor.open("input.flac") # Pedalboard handles opening various formats
-
-processor.stretch(
-    ratio=1.1,          # Make 10% slower
-    # gap_ratio=1.5,    # Stretch silence even more (see note on gap_ratio effectiveness)
-    upper_freq=350,
-    lower_freq=60,
-    double_range=True   # Allow ratios like 0.25 or 4.0
-)
-
-# Optional: Resample the processed audio
-processor.resample(48000)
-
-processor.save("processed_output.ogg") # Pedalboard infers format from extension
-# OR: processor.save("processed_output.custom", output_format="ogg")
-
-
-# --- Example 2: Processing from BytesIO ---
-# Assuming `input_audio_bytes` is a bytes object containing audio data (e.g., read from a stream)
-# and `input_format` is known (e.g., 'wav', 'mp3')
-
-# input_audio_bytes = b"..." # Your audio data
-# input_format = "wav"
-#
-# input_file_like_object = BytesIO(input_audio_bytes)
-# processor.open(file=input_file_like_object, format=input_format) # `format` might be needed if not inferable
-#
-# processor.stretch(ratio=1.5)
-#
-# output_file_like_object = BytesIO()
-# processor.save(file=output_file_like_object, format="mp3") # Specify output format
-#
-# stretched_audio_bytes = output_file_like_object.getvalue()
-# with open("output_from_bytesio.mp3", "wb") as f:
-#     f.write(stretched_audio_bytes)
-
+processor.open("input.wav")
+processor.stretch(ratio=1.2)  # 20% longer
+processor.resample(24000)
+processor.save("output.wav")
 ```
 
-## Technical Details
+Run `audiostretchy --help` for all parameters. Ratios from 0.25 to 4.0 are
+supported; the extended range automatically cascades two TDHS instances.
+Input must be mono or stereo. Stretching uses 16-bit PCM internally.
+`gap_ratio`, `buffer_ms`, `threshold_gap_db`, and `normal_detection` remain
+compatibility arguments: separate silence stretching is not implemented.
 
-### How it Works
+## Installation and platforms
 
-AudioStretchy operates through several key stages:
+Python 3.10 or newer. Published wheels contain one freshly compiled native
+library and the corresponding C sources and license:
 
-1.  **Audio Input/Output & Resampling (via `Pedalboard`):**
-    *   When an input file is provided (e.g., MP3, WAV, FLAC), `pedalboard` is used to decode it into raw audio samples (specifically, a NumPy array of `float32` values). It also reads metadata like sample rate and channel count.
-    *   If resampling is requested, `pedalboard` handles this efficiently.
-    *   After processing, `pedalboard` encodes the modified audio samples back into the desired output format.
+- Linux x86_64 and aarch64 (manylinux/glibc).
+- macOS Intel and Apple Silicon (macOS 11 or newer).
+- Windows x86_64.
 
-2.  **Core Time-Stretching (via `audio-stretch` C library & `TDHSAudioStretch` wrapper):**
-    *   The raw audio samples (float32) obtained from `pedalboard` are converted to 16-bit integers (`int16`), as the C library expects this format. If the audio is stereo, channels are interleaved (L, R, L, R...).
-    *   The `TDHSAudioStretch` class in `src/audiostretchy/c_interface/wrapper.py` uses `ctypes` to call functions from the pre-compiled `audio-stretch` shared library (e.g., `_stretch.so`, `_stretch.dylib`, `_stretch.dll`).
-    *   The C library implements **Time-Domain Harmonic Scaling (TDHS)**. This algorithm works by:
-        *   Analyzing the input audio signal in the time domain.
-        *   Identifying periodic segments (related to pitch) within the audio.
-        *   To slow down audio (stretch ratio > 1.0), it intelligently repeats these small segments.
-        *   To speed up audio (stretch ratio < 1.0), it removes some of these segments.
-        *   This is done in a way that aims to preserve the harmonic structure and formants, thus maintaining the original pitch and timbre.
-    *   Parameters like `upper_freq` and `lower_freq` guide the C library in its period detection, defining the expected range of fundamental frequencies in the audio.
-    *   Flags like `STRETCH_FAST_FLAG` (for `--fast_detection`) and `STRETCH_DUAL_FLAG` (for `--double_range`) modify the C library's behavior.
-    *   After the C library processes the audio, the resulting `int16` samples are converted back to `float32` for `pedalboard` to handle.
+The native library uses ctypes and is independent of the CPython ABI, so wheels
+carry `py3-none-<platform>` tags. Dependencies install separately; NumPy and
+Pedalboard are not copied into the wheel. Other platforms can build from the
+source distribution when a C compiler and dependency wheels are available.
+Linux musl and Windows ARM are not part of the tested wheel matrix.
 
-3.  **Python Orchestration (`AudioStretch` class):**
-    *   The `AudioStretch` class in `src/audiostretchy/core.py` manages the overall process:
-        *   Uses Pedalboard's `ReadableAudioFile`/`WriteableAudioFile` for I/O.
-        *   Prepares data for the `TDHSAudioStretch` wrapper (data type conversion, interleaving).
-        *   Calls the stretch method of `TDHSAudioStretch`.
-        *   Handles data conversion back from the wrapper.
-        *   Coordinates resampling if requested.
+All required TDHS source is bundled under `src/audiostretchy/_vendor/audio-stretch`.
+There is no submodule initialization, build-time download, or compiler needed
+when installing a compatible wheel. `UPSTREAM.md` records the pinned upstream
+commit. Builds are reproducible from that snapshot; upstream is not fetched
+implicitly during releases.
 
-The `gap_ratio` parameter is intended for applying a different stretch ratio to silent portions of the audio. While the Python wrapper passes this to the C library initialization, the current Python implementation of `AudioStretch.stretch()` processes the entire audio with the primary `ratio`. Effective utilization of `gap_ratio` would typically require the Python code to segment the audio into speech/silence parts first (e.g., based on RMS levels and `threshold_gap_db`), and then apply different ratios to these segments, or for the C library to have internal advanced segmentation logic that uses this parameter. The original C CLI application (`main.c` in `dbry/audio-stretch`) contains such segmentation logic, which is not fully replicated in the current Python bindings.
+## Development
 
-### Core Modules
-
-*   **`src/audiostretchy/__main__.py`:**
-    *   Provides the command-line interface using the `fire` library.
-    *   It calls the `stretch_audio` function from `core.py`.
-*   **`src/audiostretchy/core.py`:**
-    *   Contains the main `AudioStretch` class that orchestrates the audio processing.
-    *   Implements methods for opening, stretching, resampling, and saving audio.
-    *   Includes the `stretch_audio` convenience function used by the CLI.
-    *   Uses Pedalboard's `ReadableAudioFile`/`WriteableAudioFile` for I/O and numpy for resampling, and `TDHSAudioStretch` for the core algorithm.
-*   **`src/audiostretchy/c_interface/wrapper.py`:**
-    *   Defines the `TDHSAudioStretch` class, which is a Python `ctypes` wrapper around the pre-compiled `audio-stretch` C library.
-    *   Loads the shared library (`.so`, `.dylib`, `.dll`) based on the operating system.
-    *   Defines argument types and return types for the C functions (`stretch_init`, `stretch_samples`, `stretch_flush`, etc.).
-*   **`src/audiostretchy/interface/{win,mac,linux}/`:**
-    *   These directories contain the pre-compiled shared C libraries (`_stretch.dll`, `_stretch.dylib`, `_stretch.so`) for different platforms and architectures.
-*   **`vendors/stretch/`:**
-    *   Contains the source code of David Bryant's `audio-stretch` C library as a Git submodule. This is used for compiling the shared libraries.
-
-### Coding Conventions
-
-This project adheres to standard Python coding practices and uses tools to maintain code quality:
-
-*   **Formatting:** Code is formatted using [Black](https://github.com/psf/black).
-*   **Import Sorting:** Imports are sorted using [isort](https://pycqa.github.io/isort/). Configuration is in `.isort.cfg`.
-*   **Linting:** Code is linted using [Flake8](https://flake8.pycqa.org/en/latest/). Configuration is in `pyproject.toml` (`[tool.flake8]`).
-*   **Pre-commit Hooks:** The `.pre-commit-config.yaml` file defines hooks that run these tools automatically before commits, ensuring consistency. This includes checks for trailing whitespace, large files, valid syntax, etc.
-
-### Contributing
-
-Contributions are welcome! If you'd like to contribute, please follow these general guidelines:
-
-1.  **Fork the Repository:** Create your own fork of the `audiostretchy` repository on GitHub.
-2.  **Clone Your Fork:**
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/audiostretchy.git
-    cd audiostretchy
-    git submodule update --init --recursive
-    ```
-3.  **Create a Branch:** Create a new branch for your feature or bug fix:
-    ```bash
-    git checkout -b my-new-feature
-    ```
-4.  **Set Up Development Environment:**
-    *   It's recommended to use a virtual environment:
-        ```bash
-        python3 -m venv venv
-        source venv/bin/activate  # On Windows: venv\Scripts\activate
-        ```
-    *   Install the project in editable mode with testing dependencies:
-        ```bash
-        python3 -m pip install -e .[testing]
-        ```
-    *   Install pre-commit hooks:
-        ```bash
-        pre-commit install
-        ```
-5.  **Make Your Changes:** Implement your feature or bug fix.
-    *   Adhere to the coding conventions (Black, isort, Flake8). The pre-commit hooks will help with this.
-    *   Write tests for any new functionality in the `tests/` directory.
-6.  **Run Tests:** Ensure all tests pass:
-    ```bash
-    pytest
-    ```
-    Check test coverage:
-    ```bash
-    pytest --cov src/audiostretchy --cov-report term-missing
-    ```
-7.  **Commit Your Changes:**
-    ```bash
-    git add .
-    git commit -m "feat: Add new feature X" # Or "fix: Resolve bug Y"
-    ```
-8.  **Push to Your Fork:**
-    ```bash
-    git push origin my-new-feature
-    ```
-9.  **Submit a Pull Request:** Open a pull request from your branch to the `main` branch of the original `twardoch/audiostretchy` repository. Provide a clear description of your changes.
-
-If you plan to modify the C library code in `vendors/stretch/`, you will also need to recompile it for your platform and potentially update the CI workflows if changes are significant.
-
-## Development and Release Process
-
-AudioStretchy uses git-tag-based semantic versioning with automated CI/CD pipeline:
-
-### Quick Start for Development
-
-```bash
-# Set up development environment
-make dev
-
-# Run tests
-make test
-
-# Run linting and formatting
-make lint
-make format
-
-# Build package
-make build
+```sh
+uv sync --frozen
+./test.sh                # lint, format check and all tests
+uvx hatch test          # alternative Hatch test environment
+uv build                # sdist, then a native wheel built from that sdist
 ```
 
-### Release Process
+Building from source needs a C compiler (`cc` on Unix or MSVC `cl` on Windows).
+On Windows run from a Visual Studio developer shell. The Hatch wheel hook and
+`scripts/compile_c.py` share the same compiler implementation. Editable installs
+compile the library too. `CC`, `CFLAGS`, and `LDFLAGS` are honoured on Unix;
+`MACOSX_DEPLOYMENT_TARGET` defaults to 11.0 on macOS.
 
-```bash
-# Create a new release (requires main branch)
-make release VERSION=1.2.3
+## Releases
+
+`hatch-vcs` derives package versions from stable `vMAJOR.MINOR.PATCH` tags.
+Untagged commits get a development version; source archives preserve their
+version without needing a Git checkout.
+
+After committing your changes on `main`:
+
+```sh
+./publish.sh --check     # tests + local builds + metadata checks; no release
+./publish.sh             # auto patch version, push, CI builds, uv publish
+./publish.sh minor       # choose a minor or major bump when appropriate
+./publish.sh --resume v1.3.9  # resume the same release after fixing an external failure
 ```
 
-This will:
-- Run all tests
-- Build the package
-- Create a git tag
-- Trigger automated CI/CD pipeline
-- Publish to PyPI automatically
+The release command uses `uvx gitnextver` to create and atomically push the tag
+and branch, waits for the Release workflow, downloads its exact artifacts, and
+runs `uv publish`. GitHub Actions builds and tests all five platform wheels,
+checks metadata, publishes with `uv publish`, and attaches the same files to the
+GitHub release. Re-running upload is safe for identical files. It never silently
+creates a new version when resuming a failed release.
 
-### CI/CD Pipeline
+Local prerequisites: `uv`, authenticated `gh`, Git push access, and PyPI upload
+credentials if local upload is needed (`UV_PUBLISH_TOKEN`). GitHub uses the
+repository secret `PYPI_TOKEN`; without it, configure a PyPI trusted publisher
+for `release.yml`. Token values must stay out of files and command arguments.
 
-- **Multi-platform testing**: Ubuntu, Windows, macOS
-- **Python versions**: 3.8, 3.9, 3.10, 3.11, 3.12
-- **Automatic wheel building**: Binary wheels for all platforms
-- **Automated PyPI publishing**: On git tag creation
-
-See [SEMVER_GUIDE.md](SEMVER_GUIDE.md) for detailed release documentation.
+The CI workflow also tests Python 3.10 and 3.14 on Linux, macOS and Windows and
+builds the same five wheels on branch pushes and pull requests.
 
 ## License
 
-*   The Python wrapper code for AudioStretchy (this project) is licensed under the **BSD-3-Clause License**. See [LICENSE.txt](./LICENSE.txt). Copyright (c) 2023-2024 Adam Twardoch.
-*   The core C library `vendors/stretch/stretch.c` is Copyright (c) David Bryant and is included under its original BSD-style license.
-*   Audio I/O and Resampling functionalities are provided by [Spotify's Pedalboard library](https://github.com/spotify/pedalboard), which is licensed under the Apache License 2.0. Pedalboard itself may utilize other libraries with their own respective licenses (e.g., libsndfile, Rubber Band library).
-*   Some Python code may have been written with assistance from AI language models.
-
-_Current Version: (to be updated by release process)_
+AudioStretchy wrapper: [BSD-3-Clause](LICENSE.txt). Bundled TDHS source:
+David Bryant's BSD-style license in `_vendor/audio-stretch/license.txt`.
+Pedalboard is a separate dependency licensed under GPLv3; consult its license
+when distributing applications that use it.

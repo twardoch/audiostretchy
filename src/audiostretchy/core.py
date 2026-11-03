@@ -188,8 +188,12 @@ class AudioStretch:
         if self.samples is None:
             raise ValueError("No audio data to stretch. Call open() first")
 
-        if ratio <= 0:
-            raise ValueError("Stretch ratio must be positive")
+        if not 0.25 <= ratio <= 4.0:
+            raise ValueError("Stretch ratio must be positive and between 0.25 and 4.0")
+        if not 0 < lower_freq < upper_freq:
+            raise ValueError(
+                "Frequency limits must satisfy 0 < lower_freq < upper_freq"
+            )
 
         # Skip processing if no change needed
         effective_gap_ratio = gap_ratio if gap_ratio > 0 else ratio

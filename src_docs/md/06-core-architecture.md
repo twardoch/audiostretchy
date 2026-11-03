@@ -224,7 +224,7 @@ The C library is compiled for multiple platforms:
 
 === "Linux"
 
-    **Location**: `src/audiostretchy/interface/linux/_stretch.so`
+    **Location**: `src/audiostretchy/c_interface/lib/_stretch.so`
     
     **Build**: GCC/Clang compilation
     ```bash
@@ -233,7 +233,7 @@ The C library is compiled for multiple platforms:
 
 === "macOS"
 
-    **Location**: `src/audiostretchy/interface/mac/_stretch.dylib`
+    **Location**: `src/audiostretchy/c_interface/lib/_stretch.dylib`
     
     **Build**: Universal binary (x86_64 + arm64)
     ```bash
@@ -242,7 +242,7 @@ The C library is compiled for multiple platforms:
 
 === "Windows"
 
-    **Location**: `src/audiostretchy/interface/win/_stretch.dll`
+    **Location**: `src/audiostretchy/c_interface/lib/_stretch.dll`
     
     **Build**: MSVC compilation
     ```bash

@@ -1,4 +1,17 @@
+---
+this_file: CHANGELOG.md
+---
 # Changelog
+
+## [1.3.9] - 2026-11-03
+
+- Bundle upstream audio-stretch commit 0c8a4b8fc5ab569fa398f0f423e7cfe05be00efc and its license; no submodules or network needed for source builds.
+- Compile a fresh library during Hatch wheel/editable builds and ship Python-independent platform tags, with one binary per wheel.
+- Consolidate the native builder and legacy ctypes import; remove stale binaries and dummy extension.
+- Build and test Linux x86_64/aarch64, macOS x86_64/arm64, and Windows x86_64 wheels using GitHub Actions.
+- Automate semantic tags using gitnextver and hatch-vcs, publish exact artifacts with uv publish, and add resumable publish.sh.
+- Add native build/error regression tests and update installation, release and dependency documentation.
+
 
 ## [Unreleased] - 2026-07-05
 
