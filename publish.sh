@@ -32,7 +32,7 @@ for _attempt in {1..12}; do
     sleep 5
 done
 [[ -n "$run_id" ]] || { echo "No Release run found; retry ./publish.sh --resume $tag" >&2; exit 1; }
-gh run watch "$run_id" --exit-status
+gh run watch "$run_id" --interval 20 --exit-status
 artifacts="dist/$tag"
 mkdir -p "$artifacts"
 gh release download "$tag" --dir "$artifacts" --pattern '*.whl' --pattern '*.tar.gz' --clobber

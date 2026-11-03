@@ -1,3 +1,4 @@
+# this_file: tests/test_stretch.py
 from pathlib import Path
 
 import numpy as np
@@ -20,12 +21,12 @@ def audio_processor():
 
 @pytest.fixture
 def sample_wav_path():
-    return Path("tests/audio.wav")
+    return Path(__file__).parent / "audio.wav"
 
 
 @pytest.fixture
 def sample_mp3_path():
-    return Path("tests/audio.mp3")
+    return Path(__file__).parent / "audio.mp3"
 
 
 # --- Test AudioStretch Class ---

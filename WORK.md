@@ -20,3 +20,5 @@ Pending live acceptance: GitHub's five native builds and Python endpoint tests, 
 Unrelated pre-existing src_docs/build.sh is preserved and excluded locally through .git/info/exclude; gitnextver requires no visible untracked files. Legacy local submodule directories remain ignored; releases contain only the new source snapshot.
 
 First live release v1.3.9: setup-uv has no v10 alias; switched to verified v10.3.3. No PyPI upload occurred. CI builds wheels on PR/manual runs and releases to avoid duplicate wheel builds for the branch and tag push.
+
+Installed-wheel CI exposed cwd-relative legacy test fixtures (fixed to use __file__) and MSVC environment setup missing in the reusable wheel job (added). These failures occurred before any upload.
