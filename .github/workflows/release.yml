@@ -33,7 +33,7 @@ jobs:
       - name: Verify metadata
         run: uvx twine check --strict dist/*
       - name: Publish all verified artifacts
-        run: uv publish dist/*
+        run: uv publish --check-url https://pypi.org/simple/ dist/*
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
       - name: Attach exact published artifacts

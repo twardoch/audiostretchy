@@ -1,0 +1,3 @@
+# this_file: .gitattributes
+# Preserve the upstream snapshot byte-for-byte in Windows wheels too.
+src/audiostretchy/_vendor/audio-stretch/* text eol=lf

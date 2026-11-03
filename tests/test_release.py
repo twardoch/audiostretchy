@@ -48,5 +48,8 @@ esac
     assert result.returncode == 0, result.stderr
     commands = log.read_text()
     assert "git " not in commands and "gitnextver" not in commands
-    assert "uv publish dist/v1.3.9/release.tar.gz dist/v1.3.9/release.whl" in commands
+    assert (
+        "uv publish --check-url https://pypi.org/simple/ dist/v1.3.9/release.tar.gz dist/v1.3.9/release.whl"
+        in commands
+    )
     assert "stale.whl" not in commands

@@ -82,7 +82,7 @@ After committing your changes on `main`:
 ./publish.sh --check     # tests + local builds + metadata checks; no release
 ./publish.sh             # auto patch version, push, CI builds, uv publish
 ./publish.sh minor       # choose a minor or major bump when appropriate
-./publish.sh --resume v1.3.12  # resume the same release after fixing an external failure
+./publish.sh --resume v1.3.13  # resume the same release after fixing an external failure
 ```
 
 The release command uses `uvx gitnextver` to create and atomically push the tag

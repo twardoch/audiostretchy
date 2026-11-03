@@ -37,5 +37,5 @@ artifacts="dist/$tag"
 mkdir -p "$artifacts"
 gh release download "$tag" --dir "$artifacts" --pattern '*.whl' --pattern '*.tar.gz' --clobber
 uvx twine check --strict "$artifacts"/*
-uv publish "$artifacts"/*
+uv publish --check-url https://pypi.org/simple/ "$artifacts"/*
 echo "Published $tag"

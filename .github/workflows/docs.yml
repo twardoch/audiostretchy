@@ -52,7 +52,7 @@ jobs:
           path: ./docs
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOY_DOCS == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

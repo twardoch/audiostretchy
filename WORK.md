@@ -25,3 +25,7 @@ Installed-wheel CI exposed cwd-relative legacy test fixtures (fixed to use __fil
 
 v1.3.10: four Unix platform wheels passed installed tests. Windows compiled/loaded and passed 63 project tests, but POSIX-only empty-argument quoting also collected cibuildwheel's intentional failure fixture. Switched to cross-platform `-o addopts=`. All six Python endpoint CI jobs passed. No upload occurred.
 v1.3.11 was accidentally started before that config edit was applied; cancelled the redundant run. The corrected release will be v1.3.12.
+
+Live acceptance for v1.3.12 passed: all five platform wheels and six Python endpoint jobs green; strict Twine checks; all six PyPI SHA256 values match downloaded CI artifacts. Published with local credentials without logging values and repaired the GitHub publishing secret. Failed-job rerun succeeded. Installed release into the existing Python 3.13 environment; active CLI produced a 0.90000774 duration ratio on a WAV smoke test. Requested MP3 output was produced immediately using the same source; decodes at 48 kHz stereo, 9.144 s including MP3 frame padding (ffprobe reports 9.116646 s). Original decoded input was 10.128 s.
+
+Final release fixes: explicit --check-url makes local resume skip exact existing files without credentials (verified live); include uv.lock/Makefile in source archives; enforce upstream LF line endings in Windows checkouts. Pages was disabled (404), so its deployment job now requires DEPLOY_DOCS=true; documentation builds remain enabled. Final release will be v1.3.13.
