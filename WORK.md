@@ -22,3 +22,6 @@ Unrelated pre-existing src_docs/build.sh is preserved and excluded locally throu
 First live release v1.3.9: setup-uv has no v10 alias; switched to verified v10.3.3. No PyPI upload occurred. CI builds wheels on PR/manual runs and releases to avoid duplicate wheel builds for the branch and tag push.
 
 Installed-wheel CI exposed cwd-relative legacy test fixtures (fixed to use __file__) and MSVC environment setup missing in the reusable wheel job (added). These failures occurred before any upload.
+
+v1.3.10: four Unix platform wheels passed installed tests. Windows compiled/loaded and passed 63 project tests, but POSIX-only empty-argument quoting also collected cibuildwheel's intentional failure fixture. Switched to cross-platform `-o addopts=`. All six Python endpoint CI jobs passed. No upload occurred.
+v1.3.11 was accidentally started before that config edit was applied; cancelled the redundant run. The corrected release will be v1.3.12.
