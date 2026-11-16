@@ -1,21 +1,65 @@
 # this_file: .github/workflows/release.yml
 name: Release
+# Tag push or `./publish.sh vX.Y.Z` (gh workflow run release.yml -f tag=...).
+# Publishes to PyPI through trusted publishing (OIDC, no token).
 on:
   push:
-    tags: ['v*']
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Semver tag to release, e.g. v1.2.3"
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
-  build:
-    uses: ./.github/workflows/wheels.yml
-  publish:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+  tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - id: check
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' is not a vMAJOR.MINOR.PATCH tag"; exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; releasing it as is."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
+
+  build:
+    needs: tag
+    uses: ./.github/workflows/wheels.yml
+    with:
+      ref: refs/tags/${{ needs.tag.outputs.tag }}
+  publish:
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/audiostretchy
     permissions:
       contents: write
       id-token: write
@@ -33,11 +77,15 @@ jobs:
       - name: Verify metadata
         run: uvx twine check --strict dist/*
       - name: Publish all verified artifacts
-        run: uv publish --check-url https://pypi.org/simple/ dist/*
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/*
       - name: Attach exact published artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --verify-tag --generate-notes
+          fi

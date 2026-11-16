@@ -54,3 +54,4 @@ src/audiostretchy/c_interface/lib/
 /audio-stretch/
 /vendors/
 .trunk/
+src/audiostretchy/__version__.py

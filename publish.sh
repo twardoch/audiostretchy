@@ -1,40 +1,38 @@
 #!/usr/bin/env bash
 # this_file: publish.sh
+#
+# Release audiostretchy: asks GitHub Actions (.github/workflows/release.yml) to
+# create the tag, build, cut a GitHub release, then publish to PyPI through
+# Trusted Publishing. No PyPI token is needed locally.
+#
+# Usage: ./publish.sh            # next patch after the latest vX.Y.Z tag
+#        ./publish.sh v1.4.0     # explicit tag
+# The tag is made on the HEAD of the remote default branch, so push first.
+
 set -euo pipefail
-cd "$(dirname "$0")"
-if [[ "${1:-}" == "--check" ]]; then
-    ./test.sh
-    uv build
-    uvx twine check --strict dist/*.whl dist/*.tar.gz
-    exit 0
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+BRANCH="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
+git fetch -q --tags origin
+
+TAG="${1:-}"
+if [[ -z "$TAG" ]]; then
+  last="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
+  IFS=. read -r major minor patch <<<"${last#v}"
+  TAG="v${major:-0}.${minor:-0}.$((${patch:-0} + 1))"
 fi
-if [[ "${1:-}" == "--help" ]]; then
-    echo "Usage: ./publish.sh [--check | --resume vX.Y.Z | patch | minor | major]"
-    exit 0
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "error: '$TAG' is not a vMAJOR.MINOR.PATCH tag" >&2
+  exit 1
 fi
-command -v gh >/dev/null
-gh auth status
-if [[ "${1:-}" == "--resume" ]]; then
-    tag="${2:?Provide the existing release tag}"
-else
-    [[ "$(git branch --show-current)" == main ]] || { echo "Release from main" >&2; exit 1; }
-    [[ -z "$(git status --porcelain)" ]] || { echo "Commit changes first" >&2; exit 1; }
-    ./test.sh
-    git fetch origin main --tags
-    git merge-base --is-ancestor origin/main HEAD
-    tag=$(uvx --from gitnextver==1.0.4 gitnextver --bump "${1:-patch}" --commit=False --pull=False)
+
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH")" ]]; then
+  echo "warning: local HEAD differs from origin/$BRANCH; the release is cut from origin/$BRANCH" >&2
 fi
-# Allow GitHub a short interval to register the tag event; never create a second tag on retry.
-run_id=""
-for _attempt in {1..12}; do
-    run_id=$(gh run list --workflow release.yml --branch "$tag" --event push --json databaseId --jq '.[0].databaseId // empty')
-    [[ -z "$run_id" ]] || break
-    sleep 5
-done
-[[ -n "$run_id" ]] || { echo "No Release run found; retry ./publish.sh --resume $tag" >&2; exit 1; }
-gh run watch "$run_id" --interval 20 --exit-status
-artifacts="dist/$tag"
-mkdir -p "$artifacts"
-gh release download "$tag" --dir "$artifacts" --pattern '*.whl' --pattern '*.tar.gz' --clobber
-uvx twine check --strict "$artifacts"/*
-echo "Published $tag"
+
+echo "Releasing $REPO $TAG from $BRANCH"
+gh workflow run release.yml -R "$REPO" --ref "$BRANCH" -f tag="$TAG"
+sleep 5
+gh run list -R "$REPO" --workflow release.yml -L 1
+echo "Follow it with: gh run watch -R $REPO"

@@ -2,6 +2,11 @@
 name: Wheels
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build (default: the triggering ref)"
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -16,6 +21,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ inputs.ref }}
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
       - uses: pypa/cibuildwheel@v4.3.5
@@ -30,6 +36,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v10.3.3
       - run: uv build --sdist
       - uses: actions/upload-artifact@v4
